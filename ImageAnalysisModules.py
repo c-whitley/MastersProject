@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 
-#########################################################
+#####################################################################################################
 """
-This script contains the modules which are used to analyse the chromosome images
+			This script contains the modules which are used to analyse the chromosome images
 
 """
-#########################################################
+#####################################################################################################
 
 n = 0
 filename = "Null" #Initilising these values to be later changed in another method.
@@ -41,7 +41,7 @@ def plotProf(): #Plot profile of an image
 	plt.title('Profile number' + str(p))
 	plt.show()
 
-def plot(): #Plot image
+def plot(X,Y,Title,XAxisLabel,YAxisLabel): #Plot image
 
 	global image, FigN
 
@@ -51,9 +51,10 @@ def plot(): #Plot image
 	arr = np.asarray(image)
 	plt.imshow(arr, cmap = 'Greys_r')
 
-	plt.xlabel('X')
-	plt.ylabel('Y')
-	plt.title('Image number: ' + str(n))
+	plt.xlabel(XAxisLabel)
+	plt.ylabel(YAxisLabel)
+	#plt.title('Image number: ' + str(n))
+	plt.title(Title)
 	plt.show()
 	FigN = FigN + 1
 
@@ -85,8 +86,8 @@ def VProfileList(): #Creates array of Vertical image profiles
 
 		VList[0,i] = i+1 #The number of the profile of the image
 		VList[1,i] = pixList[(i*height):((i*height)+height):1] #The profile of the image
-	print("VProfileList: ")
-	print(VList)
+	#print("VProfileList: ")
+	#print(VList)
 	#print(HList[1,234])
 
 def createMatrix(): #Turns image into X x Y matrix of greyscale values for the image
@@ -146,24 +147,31 @@ def plotYprofile(ycoord):
 	
 	return pixMat[ycoord,:]
 
-def setup(): 
+def setup(n): 
 
-	global n ,fileName, image #Allows the variables to be changed by this method
+	#global n ,fileName, image #Allows the variables to be changed by this method
+	global fileName, image ,width, height, HList, VList #Allows the variables to be changed by this method
 
-	n = input('Input the image number: ')
+	#n = input('Input the image number: ')
+
+	print("Image number: " + str(n) + " loaded.")
 
 	Name = 'raw' + str(n) + '.jpeg'
 	fileName = '/home/conor/Desktop/Desktop/MastersProject/Chromosomes/jpegs/' + Name 
 
 	image = Image.open(fileName).convert("L")
+	
 	arr = np.asarray(image)
 
 	createMatrix()
+	HProfileList()
+	VProfileList()
 
-	return
+	properties = [fileName,image,width,height,HList,VList]
 
-setup()
+	print("Width is " + str(width))
+
+	return properties
+
 #plotYprofile()
 #plot()
-HProfileList()
-VProfileList()

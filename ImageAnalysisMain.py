@@ -1,11 +1,19 @@
-import ImageAnalysisModulesTest as ImageAnalysisModules
+import ImageAnalysisModulesTest as IAM
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from skimage import data
 from skimage.filter import threshold_otsu
+from skimage.morphology import watershed
+from skimage.feature import peak_local_max
+from skimage.segmentation import clear_border
+from skimage.color import label2rgb
+from skimage.measure import label,regionprops
 
 from scipy import ndimage as ndi
+
+figN = 1
 
 
 class ChromoImage:
@@ -31,8 +39,8 @@ class ChromoImage:
 		global width,height,image,properties
 
 		self.n = n
-		self.image = ImageAnalysisModules.aquireImage(n)
-		self.properties = ImageAnalysisModules.setup(self.image)
+		self.image = IAM.aquireImage(n)
+		self.properties = IAM.setup(self.image)
 		#print(self.fileName)
 
 		#Unpacking variables from setup method
@@ -42,18 +50,21 @@ class ChromoImage:
 		self.width = self.properties[1]
 		self.height = self.properties[2]
 
-		self.HList = ImageAnalysisModules.HProfileList(self.image)
-		self.VList = ImageAnalysisModules.VProfileList(self.image)
+		self.HList = IAM.HProfileList(self.image)
+		self.VList = IAM.VProfileList(self.image)
 
 	def plotProfile(self,HV,profN,XMin,XMax,Title):
+
+		#Set up information
+
+		FigN = 1
+
+		image = self.image
 
 		HList = self.HList
 		VList = self.VList
 
-		XAxis = "X Co-ordinate"
-		YAxis = "Greyscale value"
-
-		if HV == "H" or "h" : #If the profile to be plotted is horizontal, HV = H/h .
+		if HV == False : #If the profile to be plotted is horizontal, HV = H/h .
 
 			Y = HList[1][profN][XMin:XMax:1]
 
@@ -62,11 +73,30 @@ class ChromoImage:
 			Y = VList[1][profN][XMin:XMax:1]
 
 		X = np.linspace(XMin,XMax,num=(XMax-XMin))
-		
-		#print(len(Y))
-		#print(len(X))
 
-		ImageAnalysisModules.plotProf(X,Y,Title,XAxis,YAxis)
+		#Plotting
+
+		fig, axes = plt.subplots(ncols = 2, figsize = (8, 16))
+
+		ax = axes.ravel()
+
+		ax[0].plot(X,Y)
+		ax[0].set_title("Profile number: " + str(profN))
+		ax[0].set_ylabel("Greyscale value")
+
+		ax[1].imshow(image, cmap=plt.cm.gray, interpolation='nearest')
+		ax[1].set_title('Original Image')
+		ax[1].axis('off') #Don't display image axis
+
+		if HV == False : #If the profile to be plotted is horizontal, HV = H/h .
+			ax[1].axhline(profN, color='r')	
+			ax[0].set_xlabel("X Profile Coordinate")	
+
+		else: #If the profile to be plotted is vertical, HV = H/h .
+			ax[1].axvline(profN, color='r')
+			ax[0].set_xlabel("Y Profile Coordinate")
+
+		plt.show()
 
 	def greyHistogram(self,image):
 
@@ -111,32 +141,79 @@ class ChromoImage:
 		return binary
 
 	def watershed(self,image,plot): #
-		distance = ndi.distance_transform_edt(image) #
-		local_maxi = peak_local_max(distance,indices=False,footprint = np.ones((3,3)),labels = image)
+
+		# Now we want to separate the two objects in image
+		# Generate the markers as local maxima of the distance to the background
+
+		distance = ndi.distance_transform_edt(np.array(image))
+		local_maxi = peak_local_max(np.array(distance), indices=False, footprint=np.ones((3, 3)),labels=image)
 		markers = ndi.label(local_maxi)[0]
-		labels = watershed(-distance,markers,mask = image)
+		labels = watershed(-distance, markers, mask=image)
 
-#for n in range 
+		if plot == True:
 
-Image23 = ChromoImage(23)
+			fig, axes = plt.subplots(ncols=3, figsize=(10,5), sharex=True, sharey=True,subplot_kw={'adjustable': 'box-forced'})
+			ax = axes.ravel()
 
-#Image23.plotProfile("v",234,0,1200,"Profile") 
-#Image23.plotProfile("h",234,0,1200,"Profile")
+			st = fig.suptitle("Watershed segmentation", fontsize="x-large")
 
-###########################################################################################################
+			ax[0].imshow(image, cmap=plt.cm.gray, interpolation='nearest')
+			ax[0].set_title('Original Image')
+			ax[1].imshow(-distance, cmap=plt.cm.gray, interpolation='nearest')
+			ax[1].set_title('Distances')
+			ax[2].imshow(labels, cmap=plt.cm.spectral, interpolation='nearest')
+			ax[2].set_title('Separated Chromosomes')
 
-#Image23.greyHistogram(Image23.image)
 
-######################################################
+			for a in ax:
+			    a.set_axis_off()
+
+			fig.tight_layout()
+			plt.show()
+
+		return distance
 
 
-image = Image23.image
+for n in range(22,23): 
 
-#fig, ax = try_all_threshold(image, figsize=(10, 8), verbose=False)
-#plt.show()
+	Image23 = ChromoImage(n)
 
-#print(type(np.array(image)))
+	#Image23.plotProfile(False,500,0,1600,"Profile") #True/False = Horizontal/Vertical
+	#Image23.plotProfile("h",234,0,1200,"Profile")
 
-#ImageAnalysisModules.plotImage(Image23.OtsuThresh(image,False),"Thresholded Image","X","Y")
+	#########################################################################################################
 
-Image23.OtsuThresh(image,True)
+	#Image23.greyHistogram(Image23.image)
+
+	######################################################
+
+
+	#for n in range()
+
+	image = np.array(Image23.image)
+
+	Image23.OtsuThresh(Image23.image,False)
+	binaryImage = Image23.OtsuThresh(image,False)
+	#Image23.watershed(binaryImage,True)
+	#IAM.plotImage(binaryImage,"Binary Image","","")
+
+	cleared = clear_border(binaryImage)
+	#IAM.plotImage(cleared,"Cleared Image","","")
+
+	label_image = label(cleared)
+	image_label_overlay = label2rgb(label_image,image = image)
+	#IAM.plotImage(image_label_overlay,"Labelled Image","","")
+
+	fig, ax = plt.subplots(figsize = (10,6))
+	ax.imshow(image_label_overlay)
+
+	for region in regionprops(label_image):
+		if region.area >= 100 and region.area < 5000:
+			minr, minc, maxr,maxc = region.bbox
+			rect = mpatches.Rectangle((minc,minr),maxc-minc,maxr-minr,fill = False,edgecolor = "red",linewidth = 1)
+			#print(type(rect))
+			ax.add_patch(rect)
+			#IAM.plotImage(rect,"Highlighted Chromosomes","","")
+	ax.set_axis_off()
+	plt.tight_layout()
+	plt.show()

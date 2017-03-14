@@ -153,8 +153,12 @@ def aquireImage(n):
 
 	print("Image number: " + str(n) + " loaded.")
 
-	Name = 'raw' + str(n) + '.jpeg'
-	fileName = '/home/conor/Desktop/Desktop/MastersProject/Chromosomes/jpegs/' + Name 
+	#Name = 'raw' + str(n) + '.jpeg'
+	#fileName = '/home/conor/Desktop/Desktop/MastersProject/Chromosomes/jpegs/' + Name 
+
+	Name = 'raw' + str(n) + '.tif'
+	fileName = '/home/conor/Desktop/Desktop/MastersProject/Chromosomes/TIFs/' + Name 
+
 
 	image = Image.open(fileName).convert("L")
 	image = PIL.ImageOps.invert(image)

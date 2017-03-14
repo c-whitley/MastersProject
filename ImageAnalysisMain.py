@@ -2,10 +2,13 @@ import ImageAnalysisModulesTest as IAM
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import PIL
+import time
+import math
 
 from skimage import data
 from skimage.util import crop
-from skimage.filter import threshold_otsu,threshold_adaptive
+from skimage.filters import threshold_otsu,threshold_adaptive
 from skimage.morphology import watershed
 from skimage.feature import peak_local_max
 from skimage.segmentation import clear_border
@@ -15,6 +18,8 @@ from skimage.measure import label,regionprops
 from scipy import ndimage as ndi
 
 figN = 1
+
+t0 = time.time()
 
 
 class ChromoImage:
@@ -43,18 +48,20 @@ class ChromoImage:
 
 		self.n = n
 		self.image = IAM.aquireImage(n)
-		self.properties = IAM.setup(self.image)
+		#self.properties = IAM.setup(self.image)
 		#print(self.fileName)
 
 		#Unpacking variables from setup method
 
 		#self.fileName = self.properties[0]
 		#self.image = self.properties[1]
-		self.width = self.properties[1]
-		self.height = self.properties[2]
+		self.width ,self.height = self.image.size
 
-		self.HList = IAM.HProfileList(self.image)
-		self.VList = IAM.VProfileList(self.image)
+		#self.width = self.properties[1]
+		#self.height = self.properties[2]
+
+		#self.HList = IAM.HProfileList(self.image)
+		#self.VList = IAM.VProfileList(self.image)
 
 	def plotProfile(self,HV,profN,XMin,XMax,Title):
 
@@ -64,8 +71,8 @@ class ChromoImage:
 
 		image = self.image
 
-		HList = self.HList
-		VList = self.VList
+		HList = IAM.HProfileList(self.image)
+		VList = IAM.VProfileList(self.image)
 
 		if HV == False : #If the profile to be plotted is horizontal, HV = H/h .
 
@@ -92,10 +99,12 @@ class ChromoImage:
 		ax[1].axis('off') #Don't display image axis
 
 		if HV == False : #If the profile to be plotted is horizontal, HV = H/h .
+
 			ax[1].axhline(profN, color='r')	
 			ax[0].set_xlabel("X Profile Coordinate")	
 
 		else: #If the profile to be plotted is vertical, HV = H/h .
+
 			ax[1].axvline(profN, color='r')
 			ax[0].set_xlabel("Y Profile Coordinate")
 
@@ -175,7 +184,7 @@ class ChromoImage:
 			fig.tight_layout()
 			plt.show()
 
-		return distance
+		return distance#
 
 
 
@@ -183,109 +192,287 @@ class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of
 
 	image = 0 #Image of the chromosome
 	binary = 0 # Binary Image of the chromosome
+	PILImage = 0
+
+
 
 	def __init__(self):
-		print("Chromosome object created")
+		#print("Chromosome object created")
 		c = 1
 
+def overLaps(n): #Is the 
+
+	print(n)
+
+	if n == 23:
+
+		print("Y")
+
+		return [3,13,10,17]
+
+	else:
+ 		return [0]
+
+		
 
 #for n in range(2,3): 
 
-n = input("Type in image number: ")
+#n = input("Type in image number: ")
 
-Image = ChromoImage(n)
+histList = []
+badListhist = []
 
-#Image23.plotProfile(False,500,0,1600,"Profile") #True/False = Horizontal/Vertical
-#Image23.plotProfile("h",234,0,1200,"Profile")
+XListGood = []
+YListGood = []
 
-#########################################################################################################
+XListBad = []
+YListBad = []
 
-#Image23.greyHistogram(Image23.image)
+plot = False
 
-######################################################
-
-
-#for n in range()
-
-image = np.array(Image.image)
-im = Image.image
-
-#Image23.OtsuThresh(Image23.image,True)
-
-binaryImage = Image.OtsuThresh(image,False)
-
-#binaryImage = threshold_adaptive(image,99, method = "mean")
-
-#Image.watershed(binaryImage,False)
-#IAM.plotImage(binaryImage,"Binary Image","","")
-
-cleared = clear_border(binaryImage)
-##IAM.plotImage(cleared,"Cleared Image","","")
-
-label_image = label(cleared)
-image_label_overlay = label2rgb(label_image,image = image)
-##IAM.plotImage(image_label_overlay,"Labelled Image","","")
-
-fig, ax = plt.subplots(figsize = (10,6))
-ax.imshow(image_label_overlay)
-
-#print(regionprops(label_image)[0])
-
-props = regionprops(label_image)
-
-print(str(len(regionprops(label_image))) + " objects detected." )
-
-#Create list of cropped chromosomes
-
-#chromoList = [] # List to store chromosome objects in the image
-
-#print("Number of objects in image: " + str(len(props))
-
-i = 0
-nhighlighted = 0
-
-for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
-
-	if (region.perimeter >= 100 and region.perimeter < 1000) and (region.area >= 500 and region.area < 3500): #This filters out the regions by a set of criteria.
+first = 1
+final = 50
 
 
-		nhighlighted = nhighlighted + 1
+#for n in [23,7,16,12,31,43,54]:
+for n in range (first,final + 1,1):
+#for n in [input("Ipmber: ")]
 
-		minr, minc, maxr,maxc = region.bbox
+	Image = ChromoImage(n)
 
-		rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = "red",linewidth = 1)
-		#label = (region.label
-		#print(type(rect))
+	t1 = time.time()
+	print("Time taken: " + str((t1-t0)))
 
-		labelX , labelY = region.centroid
+	#Image23.plotProfile(False,500,0,1600,"Profile") #True/False = Horizontal/Vertical
+	#Image23.plotProfile("h",234,0,1200,"Profile")
 
-		i = i + 1
-		label = i
+	#########################################################################################################
 
-		ax.text(labelY, labelX , str(label) , horizontalalignment='left',verticalalignment='top',color = "white")
+	#Image23.greyHistogram(Image23.image)
 
-		ax.add_patch(rect)
-		#IAM.plotImage(rect,"Highlighted Chromosomes","","")
+	image = np.array(Image.image)
+	im = Image.image
 
-		#print(type(im.crop((minc,maxr,Image23.width,Image23.height))))
+	###Image.OtsuThresh(Image.image,True)
+
+	binaryImage = Image.OtsuThresh(image,False)
+	
+	#Image.watershed(binaryImage,False)
+	#IAM.plotImage(binaryImage,"Binary Image","","")
+
+	cleared = clear_border(binaryImage)
+	###IAM.plotImage(cleared,"Cleared Image","","")
+
+	label_image = label(cleared)
+	image_label_overlay = label2rgb(label_image,image = image)
+	###IAM.plotImage(image_label_overlay,"Labelled Image","","")
 
 
-		#plt.show(im.crop((minc,maxr,Image23.width,Image23.height)))
-		#chromoList[i] = cropped
 
-		chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
-		Image.chromoList.append(chromosome) #Adds it to the list of chromosomes for this image.
 
-		chromosome.image = crop(ChromoImage.image,((minr-10,maxr+10),(minc-10,maxc+10))) #Cropped image of this chromosome
+	if plot == True:
+		fig, ax = plt.subplots(figsize = (10,6))
+		ax.imshow(image_label_overlay)
+		ax.set_axis_off()
+		ax.set_title("Image number " + str(Image.n) + " ")
 
-#print(chromoList)
+	#print(regionprops(label_image)[0])
 
-print(str(nhighlighted) + " objects highlighted.")
+	props = regionprops(label_image)
 
-ax.set_axis_off()
-ax.set_title("Filtered Chromosomes: ")
-#plt.tight_layout()
+	print(str(len(regionprops(label_image))) + " objects detected." )
+
+	#Create list of cropped chromosomes
+
+	#chromoList = [] # List to store chromosome objects in the image
+
+	#print("Number of objects in image: " + str(len(props))
+
+	i = 0
+	nhighlighted = 0
+	#histList = []
+	#badListhist = []
+
+	#Dictionary of bad chromosomes in each image, manually selected
+
+	
+	dict = {"1":[36,39,47,33,10,3,8,35,19],
+			"2":[4,6,17,39,19,14,23,36],
+			"3":[4,6,11,9,7,10,15,22,27],
+			"4":[24,1,30,25,20,4,6,21],
+			"5":[8,37,32,10,17],
+			"6":[7,20,22,18,19,17,23],
+			"7":[22,16,47,56],
+			"8":[11,24,31,30,23],
+			"9":[3,5,13,9,14,21,32],
+			"10":[5,4,8,18,32,42,41],
+			"11":[5,7,2,6,16,23,30,39],
+			"12":[6,12,13,26,18,22,37,32],
+			"13":[6,11,10,25,26,23,27,29,37],
+			"14":[2,10,9,17,14,16,31,33,25],
+			"15":[3,30,26,11,31,36],
+			"16":[2,8,7,6,14,19,20,17,28],
+			"17":[2,5,7,13,4,20,21,18,38,22],
+			"18":[8,14,26],
+			"19":[20,13,27],
+			"20":[7,9,13,37],
+			"21":[6,4,18,26,46],
+			"22":[11,6,19,17,26],
+			"23":[3,13,10,17],
+			"24":[13,37,21,8],
+			"25":[7,11,18,39],
+			"26":[2,4,16,17,12],
+			"27":[3,6,1,9,32,26,34,24],
+			"28":[20,37,41,39,42,23,10],
+			"29":[80,66,46,98,6],
+			"30":[10,33,31,35],
+			"31":[12,25],
+			"32":[1,4,10,23,32,37,39],
+			"33":[5,9,15,31,35,38,22,27],
+			"34":[34,29,30,28],
+			"35":[4,9,10,13,19,38,26],
+			"36":[19,24,11,21,12,29,23,10],
+			"37":[10,11,13,21,24,29],
+			"38":[4,18,14,29,43,46],
+			"39":[8,7,4,10,11,14,21,27,20],
+			"40":[12,8,17,14,19,18,26,28],
+			"41":[12,13,23,15,29],
+			"42":[3,9,15,10,22,25,29,21],
+			"43":[1,5,14,22,8,20,29],
+			"44":[4,8,25,10],
+			"45":[6,9,22,19,27,18,14],
+			"46":[14,21,15,16,30,41,40],
+			"47":[5,10,13,17,35,31],
+			"48":[4,21,24,26,40],
+			"49":[3,4,5,9,20,29],
+			"50":[11,17,23,38,29,23,31],
+			"51":[0],
+			"52":[0],
+			"53":[0],
+			"54":[0],
+			"55":[0],
+			"56":[0],
+			"57":[0],
+			"58":[0],
+			"59":[0],
+			"60":[0]}
+	
+
+	#dict = {"1":[13,12,7,3,28],2:[23,17,9,21]}
+
+	#print ("Bad chromosomes in image number: " , str(n) , ": " , dict[23])
+
+	nBad = 0
+
+	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
+
+		#if (region.perimeter >= 100 and region.perimeter < 1000) and (region.area >= 500 and region.area < 3500): #This filters out the regions by a set of criteria.
+		if region.area >= 100 and region.area < 5500:#This filters out the regions by a set of criteria.
+
+			#histList.append(region.perimeter)
+
+			badList = dict[str(n)]
+			#badList = [3,13,10,17]
+
+			#print("Bad list: " + str(badList))
+
+			variableX = region.equivalent_diameter
+			variableY = region.perimeter
+
+			if region.label in badList: # Is the region one of the overlapping chromosomes?
+
+				#print("Overlapping chromosome found: ")
+				badListhist.append((variableX)) # Add the currently considered parameter to be histogrammed.
+
+				XListBad.append(variableX)
+				YListBad.append(variableY)
+
+				labelColour = "red"
+				nBad = nBad + 1
+
+			else:
+
+				#print("Good chromosome found: ")
+				histList.append((variableX))
+
+				XListGood.append(variableX)
+				YListGood.append(variableY)
+
+				labelColour = "green"
+
+			nhighlighted = nhighlighted + 1
+
+			minr, minc, maxr,maxc = region.bbox
+
+			rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = labelColour,linewidth = 1)
+			#label = (region.label
+			#print(type(rect))
+
+			labelX , labelY = region.centroid
+
+			i = i + 1
+			labelNum = i
+
+			if plot == True:
+
+				ax.text(labelY, labelX , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
+				ax.add_patch(rect)
+
+			#IAM.plotImage(rect,"Highlighted Chromosomes","","")
+
+			#print(type(im.crop((minc,maxr,Image23.width,Image23.height))))
+
+			#plt.show(im.crop((minc,maxr,Image23.width,Image23.height)))
+			#chromoList[i] = cropped
+
+			chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
+			Image.chromoList.append(chromosome) #Adds it to the list of chromosomes for this image.
+
+			#chromosome.image = 
+			#chromosome.image = crop(ChromoImage.image,((maxr,minr),(maxc,minc))) #Cropped image of this chromosome
+
+
+
+	#hist = np.histogram(histList, bins = np.arange(0,20))
+
+	"""
+	plt.figure()
+	plt.hist(histList,bins = 20)
+	plt.hist(badListhist,bins = 20)
+	plt.title('Histogram of region attributes: ')
+	plt.xlabel("Value")
+	plt.ylabel("Frequency")
+	plt.show(hist)
+	"""
+
+	#print(chromoList)
+
+	print(str(nhighlighted) + " objects highlighted.")
+	print(str(math.ceil(100*(nhighlighted/46))) + " percent of chromosomes highlighted")
+	print(str(nBad) + " false positives.")
+ 
+	#plt.tight_layout()
+	#plt.show()
+
+	#print(type(Image.chromoList[0].image))
+	#IAM.plotImage(Image.chromoList[0].image,"","","")
+	print("\n")
+
+
+nbins = 60
+
+plt.figure()
+
+plt.scatter(XListGood,YListGood,color = "g" )
+plt.scatter(XListBad,YListBad,color = "r" )
+
+
+#plt.title(XLabel + " vs " + YLabel)
+
+plt.figure()
+plt.hist(histList,bins = nbins,color = "g")
+plt.hist(badListhist,bins = nbins,color = "r")
+plt.title('Histogram of region attributes: ')
+plt.xlabel("Value")
+plt.ylabel("Frequency")
 plt.show()
-
-#print(type(Image.chromoList[0].image))
-IAM.plotImage(Image.chromoList[0].image,"","","")

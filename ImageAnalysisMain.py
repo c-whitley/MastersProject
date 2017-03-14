@@ -221,88 +221,24 @@ def overLaps(n): #Is the
 
 histList = []
 badListhist = []
+AnomList = []
 
-XListGood = []
+XListGood = [] # List of region attributes to plot, for the "good" chromosomes.
 YListGood = []
 
-XListBad = []
+XListBad = [] # List of region attribtues to plot, for the "bad" chromosomes.
 YListBad = []
 
-plot = False
+XListAnom = [] # List of region attributes to plot, for the anomalies
+YListAnom = []
 
-first = 1
-final = 50
-
-
-#for n in [23,7,16,12,31,43,54]:
-for n in range (first,final + 1,1):
-#for n in [input("Ipmber: ")]
-
-	Image = ChromoImage(n)
-
-	t1 = time.time()
-	print("Time taken: " + str((t1-t0)))
-
-	#Image23.plotProfile(False,500,0,1600,"Profile") #True/False = Horizontal/Vertical
-	#Image23.plotProfile("h",234,0,1200,"Profile")
-
-	#########################################################################################################
-
-	#Image23.greyHistogram(Image23.image)
-
-	image = np.array(Image.image)
-	im = Image.image
-
-	###Image.OtsuThresh(Image.image,True)
-
-	binaryImage = Image.OtsuThresh(image,False)
-	
-	#Image.watershed(binaryImage,False)
-	#IAM.plotImage(binaryImage,"Binary Image","","")
-
-	cleared = clear_border(binaryImage)
-	###IAM.plotImage(cleared,"Cleared Image","","")
-
-	label_image = label(cleared)
-	image_label_overlay = label2rgb(label_image,image = image)
-	###IAM.plotImage(image_label_overlay,"Labelled Image","","")
-
-
-
-
-	if plot == True:
-		fig, ax = plt.subplots(figsize = (10,6))
-		ax.imshow(image_label_overlay)
-		ax.set_axis_off()
-		ax.set_title("Image number " + str(Image.n) + " ")
-
-	#print(regionprops(label_image)[0])
-
-	props = regionprops(label_image)
-
-	print(str(len(regionprops(label_image))) + " objects detected." )
-
-	#Create list of cropped chromosomes
-
-	#chromoList = [] # List to store chromosome objects in the image
-
-	#print("Number of objects in image: " + str(len(props))
-
-	i = 0
-	nhighlighted = 0
-	#histList = []
-	#badListhist = []
-
-	#Dictionary of bad chromosomes in each image, manually selected
-
-	
-	dict = {"1":[36,39,47,33,10,3,8,35,19],
+crossover = {"1":[36,39,47,33,10,3,8,35,19],
 			"2":[4,6,17,39,19,14,23,36],
 			"3":[4,6,11,9,7,10,15,22,27],
 			"4":[24,1,30,25,20,4,6,21],
 			"5":[8,37,32,10,17],
 			"6":[7,20,22,18,19,17,23],
-			"7":[22,16,47,56],
+			"7":[22,16,47,56,28],
 			"8":[11,24,31,30,23],
 			"9":[3,5,13,9,14,21,32],
 			"10":[5,4,8,18,32,42,41],
@@ -355,23 +291,143 @@ for n in range (first,final + 1,1):
 			"57":[0],
 			"58":[0],
 			"59":[0],
+			"60":[0]} #Dictionary of bad chromosomes in each image, manually selected
+
+anomaly = {"1":[1],
+			"2":[48],
+			"3":[2],
+			"4":[29,28],
+			"5":[31],
+			"6":[0],
+			"7":[22,28],
+			"8":[0],
+			"9":[34],
+			"10":[13,28],
+			"11":[24,40],
+			"12":[0],
+			"13":[1,37],
+			"14":[0],
+			"15":[0],
+			"16":[42],
+			"17":[1],
+			"18":[0],
+			"19":[0],
+			"20":[42],
+			"21":[2],
+			"22":[42],
+			"23":[0],
+			"24":[31],
+			"25":[0],
+			"26":[0],
+			"27":[0],
+			"28":[0],
+			"29":[26,108],
+			"30":[0],
+			"31":[0],
+			"32":[19],
+			"33":[0],
+			"34":[1],
+			"35":[0],
+			"36":[0],
+			"37":[2],
+			"38":[0],
+			"39":[0],
+			"40":[0],
+			"41":[0],
+			"42":[0],
+			"43":[0],
+			"44":[0],
+			"45":[2],
+			"46":[0],
+			"47":[30],
+			"48":[45],
+			"49":[0],
+			"50":[0],
+			"51":[0],
+			"52":[0],
+			"53":[0],
+			"54":[0],
+			"55":[0],
+			"56":[0],
+			"57":[0],
+			"58":[0],
+			"59":[0],
 			"60":[0]}
-	
 
-	#dict = {"1":[13,12,7,3,28],2:[23,17,9,21]}
+plot = False
 
-	#print ("Bad chromosomes in image number: " , str(n) , ": " , dict[23])
+first = 1
+final = 50
+
+
+#for n in [23,7,16,12,31,43,54]:
+for n in range (first,final + 1,1):
+#for n in [input("Ipmber: ")]
+
+	Image = ChromoImage(n)
+
+	t1 = time.time()
+	print("Time taken: " + str((t1-t0)))
+
+	#Image23.plotProfile(False,500,0,1600,"Profile") #True/False = Horizontal/Vertical
+	#Image23.plotProfile("h",234,0,1200,"Profile")
+
+	#########################################################################################################
+
+	#Image23.greyHistogram(Image23.image)
+
+	image = np.array(Image.image)
+	im = Image.image
+
+	###Image.OtsuThresh(Image.image,True)
+
+	binaryImage = Image.OtsuThresh(image,False)
+
+	#Image.watershed(binaryImage,False)
+	#IAM.plotImage(binaryImage,"Binary Image","","")
+
+	cleared = clear_border(binaryImage)
+	###IAM.plotImage(cleared,"Cleared Image","","")
+
+	label_image = label(cleared)
+	image_label_overlay = label2rgb(label_image,image = image)
+	###IAM.plotImage(image_label_overlay,"Labelled Image","","")
+
+
+
+
+	if plot == True:
+		fig, ax = plt.subplots(figsize = (10,6))
+		ax.imshow(image_label_overlay)
+		ax.set_axis_off()
+		ax.set_title("Image number " + str(Image.n) + " ")
+
+	#print(regionprops(label_image)[0])
+
+	props = regionprops(label_image)
+
+	print(str(len(regionprops(label_image))) + " objects detected." )
+
+	#Create list of cropped chromosomes
+
+	#chromoList = [] # List to store chromosome objects in the image
+
+	#print("Number of objects in image: " + str(len(props))
+
+	i = 0
+	nhighlighted = 0
 
 	nBad = 0
 
+
 	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
 
-		#if (region.perimeter >= 100 and region.perimeter < 1000) and (region.area >= 500 and region.area < 3500): #This filters out the regions by a set of criteria.
-		if region.area >= 100 and region.area < 5500:#This filters out the regions by a set of criteria.
-
+		if (region.area >= 500 and region.area < 5500000):#This filters out the regions by a set of criteria.
 			#histList.append(region.perimeter)
 
-			badList = dict[str(n)]
+			crossoverList = crossover[str(n)]
+			anomalyList = anomaly[str(n)]
+
 			#badList = [3,13,10,17]
 
 			#print("Bad list: " + str(badList))
@@ -379,7 +435,7 @@ for n in range (first,final + 1,1):
 			variableX = region.equivalent_diameter
 			variableY = region.perimeter
 
-			if region.label in badList: # Is the region one of the overlapping chromosomes?
+			if region.label in crossoverList: # Is the region one of the overlapping chromosomes?
 
 				#print("Overlapping chromosome found: ")
 				badListhist.append((variableX)) # Add the currently considered parameter to be histogrammed.
@@ -389,6 +445,17 @@ for n in range (first,final + 1,1):
 
 				labelColour = "red"
 				nBad = nBad + 1
+
+			elif region.label in anomalyList:
+
+				AnomList.append((variableX))
+
+				XListAnom.append(variableX)
+				YListAnom.append(variableY)
+
+				labelColour = "blue"
+
+
 
 			else:
 
@@ -465,6 +532,7 @@ plt.figure()
 
 plt.scatter(XListGood,YListGood,color = "g" )
 plt.scatter(XListBad,YListBad,color = "r" )
+plt.scatter(XListAnom,YListAnom,color = "b")
 
 
 #plt.title(XLabel + " vs " + YLabel)
@@ -472,6 +540,8 @@ plt.scatter(XListBad,YListBad,color = "r" )
 plt.figure()
 plt.hist(histList,bins = nbins,color = "g")
 plt.hist(badListhist,bins = nbins,color = "r")
+plt.hist(AnomList,bins = nbins,color = "b")
+
 plt.title('Histogram of region attributes: ')
 plt.xlabel("Value")
 plt.ylabel("Frequency")

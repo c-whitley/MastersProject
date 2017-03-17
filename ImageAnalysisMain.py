@@ -5,15 +5,19 @@ import matplotlib.patches as mpatches
 import PIL
 import time
 import math
+import random
 
-from skimage import data
-from skimage.util import crop
-from skimage.filters import threshold_otsu,threshold_adaptive
-from skimage.morphology import watershed
-from skimage.feature import peak_local_max
-from skimage.segmentation import clear_border
-from skimage.color import label2rgb
-from skimage.measure import label,regionprops
+from skimage 				import data
+from skimage.util 			import crop
+from skimage.filters 		import threshold_otsu,threshold_adaptive
+from skimage.morphology 	import watershed
+from skimage.feature 		import peak_local_max
+from skimage.segmentation 	import clear_border
+from skimage.color 			import label2rgb
+from skimage.measure 		import label,regionprops
+
+from sklearn 				import tree
+from sklearn.neighbors 		import KNeighborsClassifier
 
 from scipy import ndimage as ndi
 
@@ -186,18 +190,23 @@ class ChromoImage:
 
 		return distance#
 
-
-
 class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of the ChromoImage class.
 
 	image = 0 #Image of the chromosome
 	binary = 0 # Binary Image of the chromosome
 	PILImage = 0
 
+	imageN = 0 # Number of the image the chromosomes is in.
+	label = 0 # The label of the chromosome in the image.
 
+	ID = 0 #Is the chromosome good/bad/anomaly ? (0,1,2)
+
+	features = [] #List of attributes associated with the chromosome e.g. area,perimeter etc.
 
 	def __init__(self):
+
 		#print("Chromosome object created")
+
 		c = 1
 
 def overLaps(n): #Is the 
@@ -212,8 +221,6 @@ def overLaps(n): #Is the
 
 	else:
  		return [0]
-
-		
 
 #for n in range(2,3): 
 
@@ -232,6 +239,7 @@ YListBad = []
 XListAnom = [] # List of region attributes to plot, for the anomalies
 YListAnom = []
 
+#List of crossed over chromosomes in each image by label
 crossover = {"1":[36,39,47,33,10,3,8,35,19],
 			"2":[4,6,17,39,19,14,23,36],
 			"3":[4,6,11,9,7,10,15,22,27],
@@ -282,17 +290,18 @@ crossover = {"1":[36,39,47,33,10,3,8,35,19],
 			"48":[4,21,24,26,40],
 			"49":[3,4,5,9,20,29],
 			"50":[11,17,23,38,29,23,31],
-			"51":[0],
-			"52":[0],
-			"53":[0],
-			"54":[0],
-			"55":[0],
-			"56":[0],
-			"57":[0],
-			"58":[0],
-			"59":[0],
-			"60":[0]} #Dictionary of bad chromosomes in each image, manually selected
+			"51":[6,12,14,17,22,23,20,6,25],
+			"52":[25,23,31,28,40,29,26],
+			"53":[6,10,16,18,19,20,25,32],
+			"54":[3,11,17,14,12,27,28],
+			"55":[13,18,21,25,32],
+			"56":[11,16,28,31,23,28],
+			"57":[11,25,17,28,32],
+			"58":[6,11,7,18],
+			"59":[8,4,11,14,23,21,33],
+			"60":[16,26,31,25]} #Dictionary of bad chromosomes in each image, manually selected
 
+#List of anomalies in each image by label.
 anomaly = {"1":[1],
 			"2":[48],
 			"3":[2],
@@ -345,24 +354,30 @@ anomaly = {"1":[1],
 			"50":[0],
 			"51":[0],
 			"52":[0],
-			"53":[0],
+			"53":[41],
 			"54":[0],
 			"55":[0],
 			"56":[0],
-			"57":[0],
+			"57":[42],
 			"58":[0],
-			"59":[0],
+			"59":[38],
 			"60":[0]}
 
 plot = False
 
 first = 1
-final = 50
+final = 60
 
+featuresList = []
+labels = []
 
-#for n in [23,7,16,12,31,43,54]:
+msixty = 0
+
+m = 0
+
+#IDList = #List of property 
+
 for n in range (first,final + 1,1):
-#for n in [input("Ipmber: ")]
 
 	Image = ChromoImage(n)
 
@@ -394,9 +409,8 @@ for n in range (first,final + 1,1):
 	###IAM.plotImage(image_label_overlay,"Labelled Image","","")
 
 
-
-
 	if plot == True:
+
 		fig, ax = plt.subplots(figsize = (10,6))
 		ax.imshow(image_label_overlay)
 		ax.set_axis_off()
@@ -415,30 +429,45 @@ for n in range (first,final + 1,1):
 	#print("Number of objects in image: " + str(len(props))
 
 	i = 0
-	nhighlighted = 0
+	nhighlighted = 0 #Number of objects highlighted
+	nchromos = 0 #Number of chromosomes highlighted
 
 	nBad = 0
 
+	unclassified = 0
+
+	#print("\n Features: \n")
 
 	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
 
-		if (region.area >= 500 and region.area < 5500000):#This filters out the regions by a set of criteria.
+		Chromosome.imageN = n
+		Chromosome.label = region.label
+
+		#print("label = " + str(Chromosome.label))
+
+		if (region.area >= 500):#This filters out the regions by a set of criteria.
 			#histList.append(region.perimeter)
 
-			crossoverList = crossover[str(n)]
+			crossoverList = crossover[str(n)] #Obtain the relevant list of crossed over chromosomes for this image.
 			anomalyList = anomaly[str(n)]
 
-			#badList = [3,13,10,17]
+			variableX = region.area
+			variableY = region.minor_axis_length
 
-			#print("Bad list: " + str(badList))
+			Chromosome.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity]
 
-			variableX = region.equivalent_diameter
-			variableY = region.perimeter
+			#print(Chromosome.features)
+
+			featuresList.append(Chromosome.features)
 
 			if region.label in crossoverList: # Is the region one of the overlapping chromosomes?
 
 				#print("Overlapping chromosome found: ")
 				badListhist.append((variableX)) # Add the currently considered parameter to be histogrammed.
+
+				Chromosome.ID = 1
+
+				labels.append(Chromosome.ID)
 
 				XListBad.append(variableX)
 				YListBad.append(variableY)
@@ -446,7 +475,12 @@ for n in range (first,final + 1,1):
 				labelColour = "red"
 				nBad = nBad + 1
 
+
 			elif region.label in anomalyList:
+
+				Chromosome.ID = 2
+
+				labels.append(Chromosome.ID)
 
 				AnomList.append((variableX))
 
@@ -455,9 +489,11 @@ for n in range (first,final + 1,1):
 
 				labelColour = "blue"
 
-
-
 			else:
+
+				Chromosome.ID = 0
+
+				labels.append(Chromosome.ID)
 
 				#print("Good chromosome found: ")
 				histList.append((variableX))
@@ -466,6 +502,9 @@ for n in range (first,final + 1,1):
 				YListGood.append(variableY)
 
 				labelColour = "green"
+
+				nchromos = nchromos + 1
+
 
 			nhighlighted = nhighlighted + 1
 
@@ -480,6 +519,10 @@ for n in range (first,final + 1,1):
 			i = i + 1
 			labelNum = i
 
+			if n == 50:
+				#print("Chromosomes number: " + str(len(labels)))
+				c = 1
+
 			if plot == True:
 
 				ax.text(labelY, labelX , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
@@ -493,11 +536,20 @@ for n in range (first,final + 1,1):
 			#chromoList[i] = cropped
 
 			chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
-			Image.chromoList.append(chromosome) #Adds it to the list of chromosomes for this image.
+			Image.chromoList.append(Chromosome) #Adds it to the list of chromosomes for this image.
 
 			#chromosome.image = 
 			#chromosome.image = crop(ChromoImage.image,((maxr,minr),(maxc,minc))) #Cropped image of this chromosome
 
+			"""
+			m = m + 1
+
+			if n == 60:
+
+				print("Fist chromosome in image 60: " + str(m))
+				msixty = m
+
+			"""
 
 
 	#hist = np.histogram(histList, bins = np.arange(0,20))
@@ -515,8 +567,8 @@ for n in range (first,final + 1,1):
 	#print(chromoList)
 
 	print(str(nhighlighted) + " objects highlighted.")
-	print(str(math.ceil(100*(nhighlighted/46))) + " percent of chromosomes highlighted")
-	print(str(nBad) + " false positives.")
+	print(str(math.ceil(100*(nchromos/46))) + " percent of chromosomes usable")
+	#print(str(nBad) + " false positives.")
  
 	#plt.tight_layout()
 	#plt.show()
@@ -546,3 +598,64 @@ plt.title('Histogram of region attributes: ')
 plt.xlabel("Value")
 plt.ylabel("Frequency")
 plt.show()
+
+
+
+
+print("Total amount of objects indentified: " + str(len(labels)))
+
+
+##################################################################################################
+
+percentage = 1
+
+Testbegin = 1695 #The chromosome number after which to start testing
+
+split = math.ceil((percentage/100)*(len(featuresList)-Testbegin))
+
+#Generate a random sample of numbers to test if the classifier is doing it's job properly.
+
+FullTrainFeatures = featuresList[0:Testbegin:1] #Takes all chromosomes up to the 1st in the 60th image.
+FullTrainLabels = labels[0:Testbegin:1]
+
+#TrainfeaturesList = random.sample(FullTrainList,math.ceil(percentage*len(FullTrainList)))	#Take the first x% images as training data from the full list.
+#Trainlabels = random.sample(FullTrainLabels,math.ceil(percentage*len(FullTrainLabels)))				#Take the labels from the first x% images
+
+TrainIndexList = random.sample(list(range(0,len(FullTrainLabels))),math.ceil((percentage/100)*len(FullTrainLabels))) # Takes a random sample of numbers determined by the percentage given
+
+#print(TrainIndexList)
+
+TrainfeaturesList =  [FullTrainFeatures[i] for i in TrainIndexList] # Finds the features corresponding to the above list.
+TrainlabelsList =  [FullTrainLabels[i] for i in TrainIndexList] # Finds the features corresponding to the above list 
+
+
+#randomList = random.sample(list(range(0,len(Testlabels))),10)
+#print(TrainfeaturesList)
+#print(str(len(TrainlabelsList)) + " training data points.")
+
+
+TestfeaturesList = featuresList[Testbegin:len(featuresList):1] 	#Take the chromosomes from the last 10 images as training data
+Testlabels = labels[Testbegin:len(featuresList):1]
+print(str(len(Testlabels)) + " test data points.")
+
+
+clf = tree.DecisionTreeClassifier()
+clf = KNeighborsClassifier
+clf = clf.fit(TrainfeaturesList,TrainlabelsList)
+#result = clf.predict([featuresList[n]])
+
+ncorrect = 0
+
+
+for n in range(0,len(Testlabels)): #How many of the identifcations are correct?
+
+	#print("The identity of the image is : " + str(Testlabels[n]))
+	#print ("Classifier result: " + str(clf.predict([TestfeaturesList[n]])) + "\n")
+
+	if clf.predict([TestfeaturesList[n]]) == Testlabels[n]:
+
+		ncorrect = ncorrect + 1
+
+	#print("Ncorrect: " + str(ncorrect))
+
+print("\nAccuracy: " + (str((ncorrect/(len(Testlabels)))*100)) + "%")

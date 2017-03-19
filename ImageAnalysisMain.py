@@ -10,7 +10,7 @@ import random
 from skimage 				import data
 from skimage.util 			import crop
 from skimage.filters 		import threshold_otsu,threshold_adaptive
-from skimage.morphology 	import watershed
+from skimage.morphology 	import watershed, skeletonize, thin
 from skimage.feature 		import peak_local_max
 from skimage.segmentation 	import clear_border
 from skimage.color 			import label2rgb
@@ -31,6 +31,7 @@ class ChromoImage:
 	#n = 0
 
 	filename = "Null" #Initilising these values to be later changed in another method.
+	PILImage = 0
 	image = 0
 
 	pixMat = 0 #Matrix of pixel greyscale values
@@ -51,7 +52,7 @@ class ChromoImage:
 		global width,height,image,properties
 
 		self.n = n
-		self.image = IAM.aquireImage(n)
+		self.pilImage = IAM.aquireImage(n)
 		#self.properties = IAM.setup(self.image)
 		#print(self.fileName)
 
@@ -59,7 +60,7 @@ class ChromoImage:
 
 		#self.fileName = self.properties[0]
 		#self.image = self.properties[1]
-		self.width ,self.height = self.image.size
+		self.width ,self.height = self.pilImage.size
 
 		#self.width = self.properties[1]
 		#self.height = self.properties[2]
@@ -190,18 +191,30 @@ class ChromoImage:
 
 		return distance#
 
+
+
+
 class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of the ChromoImage class.
 
-	image = 0 #Image of the chromosome
+	image = 0 # Numpy Image of the chromosome
 	binary = 0 # Binary Image of the chromosome
-	PILImage = 0
+	pilImage = 0 # Python image library version of the image
 
 	imageN = 0 # Number of the image the chromosomes is in.
 	label = 0 # The label of the chromosome in the image.
 
-	ID = 0 #Is the chromosome good/bad/anomaly ? (0,1,2)
+	tYpe = 0 #Is the chromosome good/bad/anomaly ? (0,1,2)
 
 	features = [] #List of attributes associated with the chromosome e.g. area,perimeter etc.
+
+	def filterBiggest (self,image): #Filter the biggest object in the image
+
+		label_image = label(image)
+		regions = regionprops(label_image)
+
+		print(region.area)
+
+		return #filteredImage
 
 	def __init__(self):
 
@@ -366,10 +379,10 @@ anomaly = {"1":[1],
 plot = False
 
 first = 1
-final = 60
+final = 1
 
-featuresList = []
-labels = []
+featuresList = [] # List of the features of all chromosomes in all images
+labels = [] # List of the labels of all chromosomes in all images
 
 msixty = 0
 
@@ -379,7 +392,7 @@ m = 0
 
 for n in range (first,final + 1,1):
 
-	Image = ChromoImage(n)
+	chromoImage = ChromoImage(n) # Creates chromosome image object for this particular image.
 
 	t1 = time.time()
 	print("Time taken: " + str((t1-t0)))
@@ -391,21 +404,21 @@ for n in range (first,final + 1,1):
 
 	#Image23.greyHistogram(Image23.image)
 
-	image = np.array(Image.image)
-	im = Image.image
+	chromoImage.Image = np.array(chromoImage.pilImage)
+	#im = chromoImage.image
 
 	###Image.OtsuThresh(Image.image,True)
 
-	binaryImage = Image.OtsuThresh(image,False)
+	chromoImage.binary = chromoImage.OtsuThresh(chromoImage.Image,False)
 
 	#Image.watershed(binaryImage,False)
 	#IAM.plotImage(binaryImage,"Binary Image","","")
 
-	cleared = clear_border(binaryImage)
+	cleared = clear_border(chromoImage.binary)
 	###IAM.plotImage(cleared,"Cleared Image","","")
 
 	label_image = label(cleared)
-	image_label_overlay = label2rgb(label_image,image = image)
+	image_label_overlay = label2rgb(label_image,image = chromoImage.Image)
 	###IAM.plotImage(image_label_overlay,"Labelled Image","","")
 
 
@@ -414,7 +427,7 @@ for n in range (first,final + 1,1):
 		fig, ax = plt.subplots(figsize = (10,6))
 		ax.imshow(image_label_overlay)
 		ax.set_axis_off()
-		ax.set_title("Image number " + str(Image.n) + " ")
+		ax.set_title("Image number " + str(chromoImage.n) + " ")
 
 	#print(regionprops(label_image)[0])
 
@@ -440,8 +453,10 @@ for n in range (first,final + 1,1):
 
 	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
 
-		Chromosome.imageN = n
-		Chromosome.label = region.label
+		ChromosomeObject = Chromosome()
+
+		ChromosomeObject.imageN = n
+		ChromosomeObject.label = region.label
 
 		#print("label = " + str(Chromosome.label))
 
@@ -454,20 +469,20 @@ for n in range (first,final + 1,1):
 			variableX = region.area
 			variableY = region.minor_axis_length
 
-			Chromosome.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity]
+			ChromosomeObject.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity]
 
 			#print(Chromosome.features)
 
-			featuresList.append(Chromosome.features)
+			featuresList.append(ChromosomeObject.features)
 
 			if region.label in crossoverList: # Is the region one of the overlapping chromosomes?
 
 				#print("Overlapping chromosome found: ")
 				badListhist.append((variableX)) # Add the currently considered parameter to be histogrammed.
 
-				Chromosome.ID = 1
+				ChromosomeObject.tYpe = 1
 
-				labels.append(Chromosome.ID)
+				labels.append(ChromosomeObject.tYpe)
 
 				XListBad.append(variableX)
 				YListBad.append(variableY)
@@ -478,9 +493,9 @@ for n in range (first,final + 1,1):
 
 			elif region.label in anomalyList:
 
-				Chromosome.ID = 2
+				ChromosomeObject.tYpe = 2
 
-				labels.append(Chromosome.ID)
+				labels.append(ChromosomeObject.tYpe)
 
 				AnomList.append((variableX))
 
@@ -491,11 +506,10 @@ for n in range (first,final + 1,1):
 
 			else:
 
-				Chromosome.ID = 0
+				ChromosomeObject.tYpe = 0
 
-				labels.append(Chromosome.ID)
+				labels.append(ChromosomeObject.tYpe)
 
-				#print("Good chromosome found: ")
 				histList.append((variableX))
 
 				XListGood.append(variableX)
@@ -509,8 +523,31 @@ for n in range (first,final + 1,1):
 			nhighlighted = nhighlighted + 1
 
 			minr, minc, maxr,maxc = region.bbox
+			#print(minr, minc, maxr,maxc)
 
 			rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = labelColour,linewidth = 1)
+
+			#IAM.plotImage(chromoImage.Image,"Chromosome Image","","")
+
+			#ChromosomeObject.Image = chromoImage.Image[0:255][minr:maxr][minc:maxc]
+			#print(chromoImage.Image.shape)
+
+			ChromosomeObject.Image = chromoImage.Image[minr-30:maxr+30,minc-30:maxc+30]
+			ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,True)
+			ChromosomeObject.cleared = clear_border(ChromosomeObject.binary)
+			IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
+			ChromosomeObject.filterBiggest(ChromosomeObject.cleared)
+			ChromosomeObject.skeleton = skeletonize(ChromosomeObject.cleared)
+			ChromosomeObject.thinned = thin(ChromosomeObject.cleared)
+
+			plt.figure()
+			plt.imshow(ChromosomeObject.Image)
+			plt.imshow(ChromosomeObject.thinned)
+			plt.show()
+
+
+			#IAM.plotImage(ChromosomeObject.Image,"Segmented Chromosome Image","","")
+
 			#label = (region.label
 			#print(type(rect))
 
@@ -535,11 +572,16 @@ for n in range (first,final + 1,1):
 			#plt.show(im.crop((minc,maxr,Image23.width,Image23.height)))
 			#chromoList[i] = cropped
 
-			chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
-			Image.chromoList.append(Chromosome) #Adds it to the list of chromosomes for this image.
+			#chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
+
+			chromoImage.chromoList.append(ChromosomeObject) #Adds it to the list of chromosomes for this image.
 
 			#chromosome.image = 
-			#chromosome.image = crop(ChromoImage.image,((maxr,minr),(maxc,minc))) #Cropped image of this chromosome
+			#Image.image = crop(ChromoImage.image,((maxr,minr),(maxc,minc))) #Cropped image of this chromosome
+			#chromosome.image = crop(ChromoImage.image,((minr,maxr),(minc,maxc),(3,3))) #Cropped image of this chromosome
+			#print(type(np.array(chromoImage.image)))
+			#IAM.plotImage()
+
 
 			"""
 			m = m + 1
@@ -605,9 +647,14 @@ plt.show()
 print("Total amount of objects indentified: " + str(len(labels)))
 
 
-##################################################################################################
+						##################################################################################################
 
-percentage = 1
+														###Classifier Section###
+
+						##################################################################################################
+
+
+percentage = 99
 
 Testbegin = 1695 #The chromosome number after which to start testing
 
@@ -640,12 +687,11 @@ print(str(len(Testlabels)) + " test data points.")
 
 
 clf = tree.DecisionTreeClassifier()
-clf = KNeighborsClassifier
+#clf = KNeighborsClassifier
 clf = clf.fit(TrainfeaturesList,TrainlabelsList)
 #result = clf.predict([featuresList[n]])
 
 ncorrect = 0
-
 
 for n in range(0,len(Testlabels)): #How many of the identifcations are correct?
 
@@ -659,3 +705,5 @@ for n in range(0,len(Testlabels)): #How many of the identifcations are correct?
 	#print("Ncorrect: " + str(ncorrect))
 
 print("\nAccuracy: " + (str((ncorrect/(len(Testlabels)))*100)) + "%")
+
+#for n in range (first,final): #Iterate through all images

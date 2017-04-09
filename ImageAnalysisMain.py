@@ -9,8 +9,8 @@ import random
 
 from skimage 				import data
 from skimage.util 			import crop
-from skimage.filters 		import threshold_otsu,threshold_adaptive
-from skimage.morphology 	import watershed, skeletonize, thin
+from skimage.filters 		import threshold_otsu
+from skimage.morphology 	import watershed, skeletonize, skeletonize_3d, remove_small_holes, binary_dilation, binary_closing, convex_hull_image,erosion
 from skimage.feature 		import peak_local_max
 from skimage.segmentation 	import clear_border
 from skimage.color 			import label2rgb
@@ -20,6 +20,8 @@ from sklearn 				import tree
 from sklearn.neighbors 		import KNeighborsClassifier
 
 from scipy import ndimage as ndi
+
+from joblib import Parallel
 
 figN = 1
 
@@ -130,6 +132,7 @@ class ChromoImage:
 
 		image  = np.array(inputImage)
 		thresh = threshold_otsu(image)
+		#thresh = threshold_sauvola(image)
 		binary = image > thresh
 
 		if plot == True:
@@ -207,12 +210,13 @@ class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of
 
 	features = [] #List of attributes associated with the chromosome e.g. area,perimeter etc.
 
+
 	def filterBiggest (self,image): #Filter the biggest object in the image
 
 		label_image = label(image)
 		regions = regionprops(label_image)
 
-		print(region.area)
+		#print(region.area)
 
 		return #filteredImage
 
@@ -234,6 +238,21 @@ def overLaps(n): #Is the
 
 	else:
  		return [0]
+
+def plot_comparison(original,filtered,filter_name):
+
+
+    fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(8, 4), sharex=True,sharey=True)
+
+    ax1.imshow(original, cmap=plt.cm.gray)
+    ax1.set_title('original')
+    ax1.axis('off')
+    ax1.set_adjustable('box-forced')
+    ax2.imshow(original, cmap=plt.cm.gray)
+    ax2.contour(filtered,cmap = plt.cm.Reds	)
+    ax2.set_title(filter_name)
+    ax2.axis('off')
+    ax2.set_adjustable('box-forced')
 
 #for n in range(2,3): 
 
@@ -377,9 +396,10 @@ anomaly = {"1":[1],
 			"60":[0]}
 
 plot = False
+plotmorphs = False
 
 first = 1
-final = 1
+final = 60
 
 featuresList = [] # List of the features of all chromosomes in all images
 labels = [] # List of the labels of all chromosomes in all images
@@ -390,7 +410,13 @@ m = 0
 
 #IDList = #List of property 
 
-for n in range (first,final + 1,1):
+imageList = [] #List of chromosome image objects
+
+for n in range(1,60+1,1):
+	imageList.append(ChromoImage(n)) # Add each image to the list of chromosomes
+
+
+#for n in range (first,final + 1,1):
 
 	chromoImage = ChromoImage(n) # Creates chromosome image object for this particular image.
 
@@ -405,6 +431,10 @@ for n in range (first,final + 1,1):
 	#Image23.greyHistogram(Image23.image)
 
 	chromoImage.Image = np.array(chromoImage.pilImage)
+	print(chromoImage.Image.size)
+
+	#IAM.plotImage(chromoImage.Image,"","","")
+
 	#im = chromoImage.image
 
 	###Image.OtsuThresh(Image.image,True)
@@ -454,7 +484,6 @@ for n in range (first,final + 1,1):
 	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
 
 		ChromosomeObject = Chromosome()
-
 		ChromosomeObject.imageN = n
 		ChromosomeObject.label = region.label
 
@@ -490,7 +519,6 @@ for n in range (first,final + 1,1):
 				labelColour = "red"
 				nBad = nBad + 1
 
-
 			elif region.label in anomalyList:
 
 				ChromosomeObject.tYpe = 2
@@ -525,26 +553,33 @@ for n in range (first,final + 1,1):
 			minr, minc, maxr,maxc = region.bbox
 			#print(minr, minc, maxr,maxc)
 
-			rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = labelColour,linewidth = 1)
+			if plot == True:
+
+				rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = labelColour,linewidth = 1)
+				ax.text(region.centroid[1], region.centroid[0] , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
+				ax.add_patch(rect)
 
 			#IAM.plotImage(chromoImage.Image,"Chromosome Image","","")
 
 			#ChromosomeObject.Image = chromoImage.Image[0:255][minr:maxr][minc:maxc]
 			#print(chromoImage.Image.shape)
 
-			ChromosomeObject.Image = chromoImage.Image[minr-30:maxr+30,minc-30:maxc+30]
-			ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,True)
-			ChromosomeObject.cleared = clear_border(ChromosomeObject.binary)
-			IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
-			ChromosomeObject.filterBiggest(ChromosomeObject.cleared)
-			ChromosomeObject.skeleton = skeletonize(ChromosomeObject.cleared)
-			ChromosomeObject.thinned = thin(ChromosomeObject.cleared)
+			#zip(profileunzipped[0],profileunzipped[1])
 
+			#print(len(profileunzipped))
+			#print(len(profileunzipped[0]))
+
+			#ChromosomeObject.skeleton3D = zip(indices[0],indices[])
+
+			#print(type(ChromosomeObject.skeleton3D))
+			#print(ChromosomeObject.skeleton3D)
+
+			"""
 			plt.figure()
 			plt.imshow(ChromosomeObject.Image)
-			plt.imshow(ChromosomeObject.thinned)
+			plt.imshow(ChromosomeObject.skeleton)
 			plt.show()
-
+			"""
 
 			#IAM.plotImage(ChromosomeObject.Image,"Segmented Chromosome Image","","")
 
@@ -560,10 +595,91 @@ for n in range (first,final + 1,1):
 				#print("Chromosomes number: " + str(len(labels)))
 				c = 1
 
+			"""
 			if plot == True:
 
-				ax.text(labelY, labelX , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
+				#print(type(ax))
+
+				ax.text(region.centroid[1], region.centroid[0] , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
 				ax.add_patch(rect)
+				plt.show()
+			"""
+
+
+			ChromosomeObject.Image = chromoImage.Image[minr-10:maxr+10,minc-10:maxc+10]
+			#IAM.plotImage(ChromosomeObject.Image,"","","")
+
+			#print(len(ChromosomeObject.Image))
+			#print(region.bbox)
+
+			ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
+			#ChromosomeObject.binary = ChromosomeObject.Image > threshold_otsu(ChromosomeObject.Image)
+			ChromosomeObject.cleared = remove_small_holes(clear_border(ChromosomeObject.binary))
+
+			ChromosomeObject.closed = binary_closing(ChromosomeObject.cleared)
+			ChromosomeObject.dilation = binary_dilation(ChromosomeObject.cleared)
+			ChromosomeObject.eroded = erosion(ChromosomeObject.cleared)
+
+
+			#IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
+			#ChromosomeObject.filterBiggest(ChromosomeObject.cleared)
+
+			ChromosomeObject.skeleton = skeletonize(ChromosomeObject.cleared)
+			ChromosomeObject.skeleton3D = skeletonize_3d(ChromosomeObject.cleared)
+
+			ChromosomeObject.closedskel = skeletonize_3d(ChromosomeObject.closed)
+			ChromosomeObject.dilationskel = skeletonize_3d(ChromosomeObject.dilation)
+			ChromosomeObject.erodedskel = skeletonize_3d(ChromosomeObject.eroded)
+
+			indices = np.where(np.all(skeletonize_3d(ChromosomeObject.cleared) == False ,axis = 0))
+			#print("Length of indices: " + str(len(indices)))
+			#print(indices)
+			#print(ChromosomeObject.erodedskel)
+			profileunzipped = (np.where(ChromosomeObject.erodedskel != 0))
+
+			######################################################################################
+
+			if ChromosomeObject.tYpe == 0 and plot == True:
+
+				#plot_comparison(ChromosomeObject.cleared,(ChromosomeObject.eroded),"Convex Hull")
+
+
+				fig, axes = plt.subplots(ncols=2,nrows=2, figsize=(8, 10),sharex=True,sharey=True,subplot_kw = {"adjustable":"box-forced"})
+				axA = axes.ravel()
+				#ax = ax
+
+				axA[0] = plt.subplot(2, 2, 1, adjustable='box-forced')
+				axA[1] = plt.subplot(2, 2, 2)
+				axA[2] = plt.subplot(2, 2, 3)
+				axA[3] = plt.subplot(2, 2, 4)
+
+				axA[0].imshow(ChromosomeObject.cleared, cmap=plt.cm.gray)
+				axA[0].contour(ChromosomeObject.eroded)
+				axA[0].contour(ChromosomeObject.erodedskel,cmap = plt.cm.Reds)
+				axA[0].set_title('Cleared Chromosome Image')
+				axA[0].axis('off')
+
+				axA[1].imshow(ChromosomeObject.closed, cmap=plt.cm.gray)
+				axA[1].set_title('Closed chromosome Image')
+				#ax[1].contour(ChromosomeObject.skeleton3D)
+				axA[1].axis('off')
+
+				axA[2].imshow(ChromosomeObject.cleared, cmap = plt.cm.gray)
+				axA[2].contour(ChromosomeObject.closedskel,cmap=plt.cm.Reds)
+				axA[2].set_title('Normal skeleton\nClosed = Red, Normal = Blue')
+				axA[2].contour(ChromosomeObject.skeleton3D, cmap = plt.cm.Blues)
+				axA[2].axis("off")
+
+				axA[3].imshow(ChromosomeObject.Image, cmap = plt.cm.gray)
+				axA[3].plot(profileunzipped[1],profileunzipped[0])
+				axA[3].set_title('Skeleton after binary closing')
+				axA[3].axis('off')
+
+				#fig.tight_layout()
+				plt.savefig("/home/conor/Desktop/Desktop/Chromosome.jpeg",bbox_inches = "tight")
+				plt.show()
+
+			#######################################################################################
 
 			#IAM.plotImage(rect,"Highlighted Chromosomes","","")
 

@@ -7,6 +7,8 @@ import time
 import math
 import random
 
+from math import sqrt
+
 from skimage 				import data
 from skimage.util 			import crop
 from skimage.filters 		import threshold_otsu
@@ -20,8 +22,12 @@ from sklearn 				import tree
 from sklearn.neighbors 		import KNeighborsClassifier
 
 from scipy import ndimage as ndi
+from scipy.spatial.distance import cdist
 
-from joblib import Parallel
+
+from joblib import Parallel, delayed
+
+plt.style.use("ggplot")
 
 figN = 1
 
@@ -124,8 +130,10 @@ class ChromoImage:
 		fig,axes = plt.subplots(1,2,figsize=(8,3))
 		axes[0].imshow(image, cmap=plt.cm.gray,interpolation = 'nearest')
 		axes[0].axis('off')
-		axes[1].plot(hist[1][:-1],hist[0],lw=2)
-		axes[1].set_title('Histogram of grey values')
+		axes[1].plot(hist[1][:-1],hist[0],lw=2,color = "Red")
+		axes[1].set_title('Histogram of grey values',fontsize = 24)
+		axes[1].set_xlabel("Greyscale Value",fontsize = 22)
+		axes[1].set_ylabel("Count",fontsize = 22)
 		plt.show()
 
 	def OtsuThresh(self,inputImage,plot):
@@ -226,19 +234,6 @@ class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of
 
 		c = 1
 
-def overLaps(n): #Is the 
-
-	print(n)
-
-	if n == 23:
-
-		print("Y")
-
-		return [3,13,10,17]
-
-	else:
- 		return [0]
-
 def plot_comparison(original,filtered,filter_name):
 
 
@@ -254,169 +249,176 @@ def plot_comparison(original,filtered,filter_name):
     ax2.axis('off')
     ax2.set_adjustable('box-forced')
 
-#for n in range(2,3): 
+def orderArray(points):
 
-#n = input("Type in image number: ")
+	#print("Length of array: " + str(len(points)))
 
-histList = []
-badListhist = []
-AnomList = []
+	x = points[0][1]
+	y = points[0][0]
 
-XListGood = [] # List of region attributes to plot, for the "good" chromosomes.
-YListGood = []
+	points.sort(key = lambda p: sqrt((p[1]-x)**2 + (p[0] - y)**2))
 
-XListBad = [] # List of region attribtues to plot, for the "bad" chromosomes.
-YListBad = []
+	#print("Length of sorted array: " + str(len(points)))
+	return points
 
-XListAnom = [] # List of region attributes to plot, for the anomalies
-YListAnom = []
-
-#List of crossed over chromosomes in each image by label
-crossover = {"1":[36,39,47,33,10,3,8,35,19],
-			"2":[4,6,17,39,19,14,23,36],
-			"3":[4,6,11,9,7,10,15,22,27],
-			"4":[24,1,30,25,20,4,6,21],
-			"5":[8,37,32,10,17],
-			"6":[7,20,22,18,19,17,23],
-			"7":[22,16,47,56,28],
-			"8":[11,24,31,30,23],
-			"9":[3,5,13,9,14,21,32],
-			"10":[5,4,8,18,32,42,41],
-			"11":[5,7,2,6,16,23,30,39],
-			"12":[6,12,13,26,18,22,37,32],
-			"13":[6,11,10,25,26,23,27,29,37],
-			"14":[2,10,9,17,14,16,31,33,25],
-			"15":[3,30,26,11,31,36],
-			"16":[2,8,7,6,14,19,20,17,28],
-			"17":[2,5,7,13,4,20,21,18,38,22],
-			"18":[8,14,26],
-			"19":[20,13,27],
-			"20":[7,9,13,37],
-			"21":[6,4,18,26,46],
-			"22":[11,6,19,17,26],
-			"23":[3,13,10,17],
-			"24":[13,37,21,8],
-			"25":[7,11,18,39],
-			"26":[2,4,16,17,12],
-			"27":[3,6,1,9,32,26,34,24],
-			"28":[20,37,41,39,42,23,10],
-			"29":[80,66,46,98,6],
-			"30":[10,33,31,35],
-			"31":[12,25],
-			"32":[1,4,10,23,32,37,39],
-			"33":[5,9,15,31,35,38,22,27],
-			"34":[34,29,30,28],
-			"35":[4,9,10,13,19,38,26],
-			"36":[19,24,11,21,12,29,23,10],
-			"37":[10,11,13,21,24,29],
-			"38":[4,18,14,29,43,46],
-			"39":[8,7,4,10,11,14,21,27,20],
-			"40":[12,8,17,14,19,18,26,28],
-			"41":[12,13,23,15,29],
-			"42":[3,9,15,10,22,25,29,21],
-			"43":[1,5,14,22,8,20,29],
-			"44":[4,8,25,10],
-			"45":[6,9,22,19,27,18,14],
-			"46":[14,21,15,16,30,41,40],
-			"47":[5,10,13,17,35,31],
-			"48":[4,21,24,26,40],
-			"49":[3,4,5,9,20,29],
-			"50":[11,17,23,38,29,23,31],
-			"51":[6,12,14,17,22,23,20,6,25],
-			"52":[25,23,31,28,40,29,26],
-			"53":[6,10,16,18,19,20,25,32],
-			"54":[3,11,17,14,12,27,28],
-			"55":[13,18,21,25,32],
-			"56":[11,16,28,31,23,28],
-			"57":[11,25,17,28,32],
-			"58":[6,11,7,18],
-			"59":[8,4,11,14,23,21,33],
-			"60":[16,26,31,25]} #Dictionary of bad chromosomes in each image, manually selected
-
-#List of anomalies in each image by label.
-anomaly = {"1":[1],
-			"2":[48],
-			"3":[2],
-			"4":[29,28],
-			"5":[31],
-			"6":[0],
-			"7":[22,28],
-			"8":[0],
-			"9":[34],
-			"10":[13,28],
-			"11":[24,40],
-			"12":[0],
-			"13":[1,37],
-			"14":[0],
-			"15":[0],
-			"16":[42],
-			"17":[1],
-			"18":[0],
-			"19":[0],
-			"20":[42],
-			"21":[2],
-			"22":[42],
-			"23":[0],
-			"24":[31],
-			"25":[0],
-			"26":[0],
-			"27":[0],
-			"28":[0],
-			"29":[26,108],
-			"30":[0],
-			"31":[0],
-			"32":[19],
-			"33":[0],
-			"34":[1],
-			"35":[0],
-			"36":[0],
-			"37":[2],
-			"38":[0],
-			"39":[0],
-			"40":[0],
-			"41":[0],
-			"42":[0],
-			"43":[0],
-			"44":[0],
-			"45":[2],
-			"46":[0],
-			"47":[30],
-			"48":[45],
-			"49":[0],
-			"50":[0],
-			"51":[0],
-			"52":[0],
-			"53":[41],
-			"54":[0],
-			"55":[0],
-			"56":[0],
-			"57":[42],
-			"58":[0],
-			"59":[38],
-			"60":[0]}
-
-plot = False
-plotmorphs = False
-
-first = 1
-final = 60
-
-featuresList = [] # List of the features of all chromosomes in all images
-labels = [] # List of the labels of all chromosomes in all images
-
-msixty = 0
-
-m = 0
-
-#IDList = #List of property 
-
-imageList = [] #List of chromosome image objects
-
-for n in range(1,60+1,1):
-	imageList.append(ChromoImage(n)) # Add each image to the list of chromosomes
+def featureExtraction(n):
 
 
-#for n in range (first,final + 1,1):
+	histList = []
+	badListhist = []
+	AnomList = []
+
+	XListGood = [] # List of region attributes to plot, for the "good" chromosomes.
+	YListGood = []
+
+	XListBad = [] # List of region attribtues to plot, for the "bad" chromosomes.
+	YListBad = []
+
+	XListAnom = [] # List of region attributes to plot, for the anomalies
+	YListAnom = []
+
+	ListofChromos = []
+
+	#List of crossed over chromosomes in each image by label
+	crossover = {"1":[36,39,47,33,10,3,8,35,19],
+				"2":[4,6,17,39,19,14,23,36],
+				"3":[4,6,11,9,7,10,15,22,27],
+				"4":[24,1,30,25,20,4,6,21],
+				"5":[8,37,32,10,17],
+				"6":[7,20,22,18,19,17,23],
+				"7":[22,16,47,56,28],
+				"8":[11,24,31,30,23],
+				"9":[3,5,13,9,14,21,32],
+				"10":[5,4,8,18,32,42,41],
+				"11":[5,7,2,6,16,23,30,39],
+				"12":[6,12,13,26,18,22,37,32],
+				"13":[6,11,10,25,26,23,27,29,37],
+				"14":[2,10,9,17,14,16,31,33,25],
+				"15":[3,30,26,11,31,36],
+				"16":[2,8,7,6,14,19,20,17,28],
+				"17":[2,5,7,13,4,20,21,18,38,22],
+				"18":[8,14,26],
+				"19":[20,13,27],
+				"20":[7,9,13,37],
+				"21":[6,4,18,26,46],
+				"22":[11,6,19,17,26],
+				"23":[3,13,10,17],
+				"24":[13,37,21,8],
+				"25":[7,11,18,39],
+				"26":[2,4,16,17,12],
+				"27":[3,6,1,9,32,26,34,24],
+				"28":[20,37,41,39,42,23,10],
+				"29":[80,66,46,98,6],
+				"30":[10,33,31,35],
+				"31":[12,25],
+				"32":[1,4,10,23,32,37,39],
+				"33":[5,9,15,31,35,38,22,27],
+				"34":[34,29,30,28],
+				"35":[4,9,10,13,19,38,26],
+				"36":[19,24,11,21,12,29,23,10],
+				"37":[10,11,13,21,24,29],
+				"38":[4,18,14,29,43,46],
+				"39":[8,7,4,10,11,14,21,27,20],
+				"40":[12,8,17,14,19,18,26,28],
+				"41":[12,13,23,15,29],
+				"42":[3,9,15,10,22,25,29,21],
+				"43":[1,5,14,22,8,20,29],
+				"44":[4,8,25,10],
+				"45":[6,9,22,19,27,18,14],
+				"46":[14,21,15,16,30,41,40],
+				"47":[5,10,13,17,35,31],
+				"48":[4,21,24,26,40],
+				"49":[3,4,5,9,20,29],
+				"50":[11,17,23,38,29,23,31],
+				"51":[6,12,14,17,22,23,20,6,25],
+				"52":[25,23,31,28,40,29,26],
+				"53":[6,10,16,18,19,20,25,32],
+				"54":[3,11,17,14,12,27,28],
+				"55":[13,18,21,25,32],
+				"56":[11,16,28,31,23,28],
+				"57":[11,25,17,28,32],
+				"58":[6,11,7,18],
+				"59":[8,4,11,14,23,21,33],
+				"60":[16,26,31,25]} #Dictionary of bad chromosomes in each image, manually selected
+
+	#List of anomalies in each image by label.
+	anomaly = {"1":[1],
+				"2":[48],
+				"3":[2],
+				"4":[29,28],
+				"5":[31],
+				"6":[0],
+				"7":[22,28],
+				"8":[0],
+				"9":[34],
+				"10":[13,28],
+				"11":[24,40],
+				"12":[0],
+				"13":[1,37],
+				"14":[0],
+				"15":[0],
+				"16":[42],
+				"17":[1],
+				"18":[0],
+				"19":[0],
+				"20":[42],
+				"21":[2],
+				"22":[42],
+				"23":[0],
+				"24":[31],
+				"25":[0],
+				"26":[0],
+				"27":[0],
+				"28":[0],
+				"29":[26,108],
+				"30":[0],
+				"31":[0],
+				"32":[19],
+				"33":[0],
+				"34":[1],
+				"35":[0],
+				"36":[0],
+				"37":[2],
+				"38":[0],
+				"39":[0],
+				"40":[0],
+				"41":[0],
+				"42":[0],
+				"43":[0],
+				"44":[0],
+				"45":[2],
+				"46":[0],
+				"47":[30],
+				"48":[45],
+				"49":[0],
+				"50":[0],
+				"51":[0],
+				"52":[0],
+				"53":[41],
+				"54":[0],
+				"55":[0],
+				"56":[0],
+				"57":[42],
+				"58":[0],
+				"59":[38],
+				"60":[0]}
+
+	plot = True
+	plotmorphs = False
+
+	first = 1
+	final = 60
+
+	featuresList = [] # List of the features of all chromosomes in all images
+	labels = [] # List of the labels of all chromosomes in all images
+
+	m = 0
+
+	#IDList = #List of property 
+
+	imageList = [] #List of chromosome image objects
+
+	#for n in range (first,final + 1,1):
 
 	chromoImage = ChromoImage(n) # Creates chromosome image object for this particular image.
 
@@ -432,6 +434,8 @@ for n in range(1,60+1,1):
 
 	chromoImage.Image = np.array(chromoImage.pilImage)
 	print(chromoImage.Image.size)
+
+	chromoImage.greyHistogram(chromoImage.Image)
 
 	#IAM.plotImage(chromoImage.Image,"","","")
 
@@ -480,6 +484,7 @@ for n in range(1,60+1,1):
 	unclassified = 0
 
 	#print("\n Features: \n")
+	
 
 	for region in regionprops(label_image): #This loop cycles through each of the regions detected in the image
 
@@ -498,8 +503,7 @@ for n in range(1,60+1,1):
 			variableX = region.area
 			variableY = region.minor_axis_length
 
-			ChromosomeObject.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity]
-
+			ChromosomeObject.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity,region.filled_area]
 			#print(Chromosome.features)
 
 			featuresList.append(ChromosomeObject.features)
@@ -559,83 +563,60 @@ for n in range(1,60+1,1):
 				ax.text(region.centroid[1], region.centroid[0] , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
 				ax.add_patch(rect)
 
-			#IAM.plotImage(chromoImage.Image,"Chromosome Image","","")
-
-			#ChromosomeObject.Image = chromoImage.Image[0:255][minr:maxr][minc:maxc]
-			#print(chromoImage.Image.shape)
-
-			#zip(profileunzipped[0],profileunzipped[1])
-
-			#print(len(profileunzipped))
-			#print(len(profileunzipped[0]))
-
-			#ChromosomeObject.skeleton3D = zip(indices[0],indices[])
-
-			#print(type(ChromosomeObject.skeleton3D))
-			#print(ChromosomeObject.skeleton3D)
-
-			"""
-			plt.figure()
-			plt.imshow(ChromosomeObject.Image)
-			plt.imshow(ChromosomeObject.skeleton)
-			plt.show()
-			"""
-
-			#IAM.plotImage(ChromosomeObject.Image,"Segmented Chromosome Image","","")
-
-			#label = (region.label
-			#print(type(rect))
 
 			labelX , labelY = region.centroid
 
 			i = i + 1
 			labelNum = i
 
-			if n == 50:
-				#print("Chromosomes number: " + str(len(labels)))
-				c = 1
-
-			"""
-			if plot == True:
-
-				#print(type(ax))
-
-				ax.text(region.centroid[1], region.centroid[0] , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
-				ax.add_patch(rect)
-				plt.show()
-			"""
-
-
-			ChromosomeObject.Image = chromoImage.Image[minr-10:maxr+10,minc-10:maxc+10]
-			#IAM.plotImage(ChromosomeObject.Image,"","","")
-
-			#print(len(ChromosomeObject.Image))
+			ChromosomeObject.Image = chromoImage.Image[minr:maxr,minc:maxc]
+			#ChromosomeObject.Image = region.filled_image
+			#IAM.plotImage(ChromosomeObject.Image,"This plot","","")
+			#pr#int(len(ChromosomeObject.Image))
 			#print(region.bbox)
 
-			ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
-			#ChromosomeObject.binary = ChromosomeObject.Image > threshold_otsu(ChromosomeObject.Image)
-			ChromosomeObject.cleared = remove_small_holes(clear_border(ChromosomeObject.binary))
+			#ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
+			#IAM.plotImage(ChromosomeObject.binary,"Otsu plot","","")
+			ChromosomeObject.binary = region.image
+			ChromosomeObject.binaryotsu = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
+			#ChromosomeObject.cleared = remove_small_holes(ChromosomeObject.binary)
 
-			ChromosomeObject.closed = binary_closing(ChromosomeObject.cleared)
-			ChromosomeObject.dilation = binary_dilation(ChromosomeObject.cleared)
-			ChromosomeObject.eroded = erosion(ChromosomeObject.cleared)
+			ChromosomeObject.closed = remove_small_holes(binary_closing(ChromosomeObject.binary))
+			#ChromosomeObject.dilation = binary_dilation(ChromosomeObject.binary)
+			#ChromosomeObject.eroded = erosion(ChromosomeObject.binary)
 
 
 			#IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
-			#ChromosomeObject.filterBiggest(ChromosomeObject.cleared)
 
-			ChromosomeObject.skeleton = skeletonize(ChromosomeObject.cleared)
-			ChromosomeObject.skeleton3D = skeletonize_3d(ChromosomeObject.cleared)
+			#ChromosomeObject.skeleton = skeletonize(ChromosomeObject.binary)
+			ChromosomeObject.skeleton3D = skeletonize_3d(ChromosomeObject.binary)
 
-			ChromosomeObject.closedskel = skeletonize_3d(ChromosomeObject.closed)
-			ChromosomeObject.dilationskel = skeletonize_3d(ChromosomeObject.dilation)
-			ChromosomeObject.erodedskel = skeletonize_3d(ChromosomeObject.eroded)
+			#ChromosomeObject.closedskel = skeletonize_3d(ChromosomeObject.closed)
+			#ChromosomeObject.dilationskel = skeletonize_3d(ChromosomeObject.dilation)
+			ChromosomeObject.finalskel = skeletonize_3d(ChromosomeObject.closed)
 
-			indices = np.where(np.all(skeletonize_3d(ChromosomeObject.cleared) == False ,axis = 0))
-			#print("Length of indices: " + str(len(indices)))
-			#print(indices)
-			#print(ChromosomeObject.erodedskel)
-			profileunzipped = (np.where(ChromosomeObject.erodedskel != 0))
+			#IAM.plotImage(ChromosomeObject.Image,"This plot","","")
+
+			#indices = np.where(np.all(skeletonize_3d(ChromosomeObject.closed) == False ,axis = 0))
+
+			profileunzipped = (np.where(ChromosomeObject.finalskel != 0))
+			#print(type(profileunzipped))
+
+			profilezipped = np.array(list(zip(profileunzipped[0],profileunzipped[1])))
+			profileflipped = reversed(profilezipped)
+
+			profileordered = IAM.order(profilezipped,False,ChromosomeObject.Image)
+
+			#profileordered = profilezipped
+
+			#print(profilezipped)
+			orderedunzipped = list(zip(*profileordered[1]))
+			#print(orderedunzipped)
+
+			#print(len(profilezipped))
+			#profileunzipped = sorted(profileunzipped, key = lambda k: [k[0],k[1]])
+
+			#print(profileunzipped)
 
 			######################################################################################
 
@@ -653,9 +634,10 @@ for n in range(1,60+1,1):
 				axA[2] = plt.subplot(2, 2, 3)
 				axA[3] = plt.subplot(2, 2, 4)
 
-				axA[0].imshow(ChromosomeObject.cleared, cmap=plt.cm.gray)
-				axA[0].contour(ChromosomeObject.eroded)
-				axA[0].contour(ChromosomeObject.erodedskel,cmap = plt.cm.Reds)
+				axA[0].imshow(ChromosomeObject.binary, cmap=plt.cm.gray)
+				axA[0].contour(ChromosomeObject.binaryotsu, cmap = plt.cm.Reds)
+
+				#axA[0].contour(ChromosomeObject.erodedskel,cmap = plt.cm.Reds)
 				axA[0].set_title('Cleared Chromosome Image')
 				axA[0].axis('off')
 
@@ -664,14 +646,17 @@ for n in range(1,60+1,1):
 				#ax[1].contour(ChromosomeObject.skeleton3D)
 				axA[1].axis('off')
 
-				axA[2].imshow(ChromosomeObject.cleared, cmap = plt.cm.gray)
-				axA[2].contour(ChromosomeObject.closedskel,cmap=plt.cm.Reds)
-				axA[2].set_title('Normal skeleton\nClosed = Red, Normal = Blue')
-				axA[2].contour(ChromosomeObject.skeleton3D, cmap = plt.cm.Blues)
+				axA[2].imshow(ChromosomeObject.closed, cmap = plt.cm.gray)
+				#axA[2].contour(ChromosomeObject.closedskel,cmap=plt.cm.Reds)
+				axA[2].set_title('Image cleared of small holes')
+				#axA[2].plot(profileordered[1],profileordered[0])
+				#axA[2].contour(ChromosomeObject.skeleton3D, cmap = plt.cm.Blues)
 				axA[2].axis("off")
 
 				axA[3].imshow(ChromosomeObject.Image, cmap = plt.cm.gray)
-				axA[3].plot(profileunzipped[1],profileunzipped[0])
+				#axA[3].plot(profilezipped[1],profilezipped[0])
+				axA[3].plot(orderedunzipped[1],orderedunzipped[0])
+				#axA[3].contour(ChromosomeObject.skeleton3D)
 				axA[3].set_title('Skeleton after binary closing')
 				axA[3].axis('off')
 
@@ -681,37 +666,15 @@ for n in range(1,60+1,1):
 
 			#######################################################################################
 
-			#IAM.plotImage(rect,"Highlighted Chromosomes","","")
-
-			#print(type(im.crop((minc,maxr,Image23.width,Image23.height))))
-
-			#plt.show(im.crop((minc,maxr,Image23.width,Image23.height)))
-			#chromoList[i] = cropped
-
-			#chromosome = Chromosome() #Creates a new object associated with the filtered chromosome object
-
 			chromoImage.chromoList.append(ChromosomeObject) #Adds it to the list of chromosomes for this image.
 
-			#chromosome.image = 
-			#Image.image = crop(ChromoImage.image,((maxr,minr),(maxc,minc))) #Cropped image of this chromosome
-			#chromosome.image = crop(ChromoImage.image,((minr,maxr),(minc,maxc),(3,3))) #Cropped image of this chromosome
-			#print(type(np.array(chromoImage.image)))
-			#IAM.plotImage()
-
-
-			"""
-			m = m + 1
-
-			if n == 60:
-
-				print("Fist chromosome in image 60: " + str(m))
-				msixty = m
+			ListofChromos.append(ChromosomeObject)
 
 			"""
 
 
 	#hist = np.histogram(histList, bins = np.arange(0,20))
-
+	"""
 	"""
 	plt.figure()
 	plt.hist(histList,bins = 20)
@@ -735,6 +698,27 @@ for n in range(1,60+1,1):
 	#IAM.plotImage(Image.chromoList[0].image,"","","")
 	print("\n")
 
+	print("Number of Chromosomes for this image: " + str(len(ListofChromos)))
+
+	return(ListofChromos)
+
+imageList = []
+
+TotalChromoList = []
+
+for n in range(1,60+1,1):
+
+	imageList.append(ChromoImage(n)) # Add each image to the list of chromosomes
+
+TotalChromoList = []
+
+TotalChromoList = TotalChromoList + (Parallel(n_jobs = 1)(delayed(featureExtraction)(i) for i in range(1,61,1)))
+
+print("Chromosome type: " + str(TotalChromoList[3][12].tYpe))
+
+print("Size of list: ")
+
+print(np.array(TotalChromoList).shape)
 
 nbins = 60
 

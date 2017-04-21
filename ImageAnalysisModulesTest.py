@@ -254,7 +254,7 @@ def endofskel(List):
 			return endcoord
 
 
-def order(List,plot):
+def order(List,plot,Image):
 
 	ordered = [] #List of ordered coordinates
 	#print(List)
@@ -316,11 +316,13 @@ def order(List,plot):
 	if plot == True:
 
 		plt.figure()
-		plt.title("cutting the grass with perpetuating freedom to ones unadultered cheese lust")
+		plt.title("Chromosome skeleton")
+		plt.imshow(Image,cmap=plt.cm.gray)
 		plt.scatter(list(zip(*List))[1],list(zip(*List))[0])
-		plt.plot(list(zip(*List))[1],list(zip(*List))[0],color = "green")
-		plt.plot(list(zip(*ordered))[1],list(zip(*ordered))[0],color = "red")
-		plt.show()
+		plt.plot(list(zip(*List))[1],list(zip(*List))[0],color = "green",label = "Chromosome Skeleton")
+		plt.plot(list(zip(*ordered))[1],list(zip(*ordered))[0],color = "red",label = "Ordered Chromosome skeleton")
+		plt.legend()
+		plt.show() 
 
 	output.append(length)
 	output.append(ordered)

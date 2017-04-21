@@ -9,25 +9,41 @@ import random
 
 from math import sqrt
 
-from skimage 				import data
-from skimage.util 			import crop
-from skimage.filters 		import threshold_otsu
-from skimage.morphology 	import watershed, skeletonize, skeletonize_3d, remove_small_holes, binary_dilation, binary_closing, convex_hull_image,erosion
-from skimage.feature 		import peak_local_max
-from skimage.segmentation 	import clear_border
-from skimage.color 			import label2rgb
-from skimage.measure 		import label,regionprops
+from skimage 						import data
+from skimage.util 					import crop
+from skimage.filters 				import threshold_otsu, threshold_yen, threshold_li, threshold_adaptive, threshold_isodata
+from skimage.morphology 			import watershed, skeletonize, skeletonize_3d, remove_small_holes, binary_dilation, binary_closing, convex_hull_image,erosion
+from skimage.feature 				import peak_local_max
+from skimage.segmentation 			import clear_border
+from skimage.color 					import label2rgb
+from skimage.measure 				import label,regionprops
+from skimage.restoration			import denoise_bilateral, denoise_tv_chambolle
 
-from sklearn 				import tree
-from sklearn.neighbors 		import KNeighborsClassifier
+from sklearn 						import model_selection, decomposition, linear_model
+from sklearn.metrics 				import classification_report
+from sklearn.metrics 				import confusion_matrix
+from sklearn.metrics 				import accuracy_score
 
-from scipy import ndimage as ndi
-from scipy.spatial.distance import cdist
+from sklearn.tree 					import DecisionTreeClassifier
+from sklearn.neighbors 				import KNeighborsClassifier
+from sklearn.linear_model 			import LogisticRegression
+from sklearn.discriminant_analysis 	import LinearDiscriminantAnalysis
+from sklearn.naive_bayes 			import GaussianNB
+from sklearn.svm 					import SVC
+
+from scipy 							import ndimage as ndi
+from scipy.spatial.distance 		import cdist
+
+import pandas as pd
+from pandas.tools.plotting 			import scatter_matrix
+
+import plotly.plotly as py
+import plotly.figure_factory as ff
 
 
 from joblib import Parallel, delayed
 
-plt.style.use("ggplot")
+#plt.style.use("ggplot")
 
 figN = 1
 
@@ -123,18 +139,41 @@ class ChromoImage:
 
 		plt.show()
 
-	def greyHistogram(self,image):
+	def greyHistogram(self,image,plot):
 
 		hist = np.histogram(image, bins = np.arange(0,256))
 
-		fig,axes = plt.subplots(1,2,figsize=(8,3))
-		axes[0].imshow(image, cmap=plt.cm.gray,interpolation = 'nearest')
-		axes[0].axis('off')
-		axes[1].plot(hist[1][:-1],hist[0],lw=2,color = "Red")
-		axes[1].set_title('Histogram of grey values',fontsize = 24)
-		axes[1].set_xlabel("Greyscale Value",fontsize = 22)
-		axes[1].set_ylabel("Count",fontsize = 22)
-		plt.show()
+		liThresh = threshold_li(image)
+		OtsuThresh = threshold_otsu(image)
+		yenThresh = threshold_yen(image)
+
+		plt.figure()
+		plt.plot(hist[1][:-1],hist[0],lw=2,color = "BLack")
+		#axes[1].set_title('Histogram of grey values',fontsize = 24)
+		plt.xlabel("Greyscale Value",fontsize = 24)
+		plt.ylabel("Count",fontsize = 24)
+		plt.xlim((0,255))
+
+		plt.axvline(liThresh, color='r',label = "Li")
+		plt.axvline(OtsuThresh, color='g',label = "Otsu")
+		plt.axvline(yenThresh, color='b',label = "Yen")
+
+		plt.legend()
+
+		if plot == True:
+
+			fig,axes = plt.subplots(1,2,figsize=(8,3))
+			axes[0].imshow(image, cmap=plt.cm.gray,interpolation = 'nearest')
+			axes[0].axis('off')
+			axes[1].plot(hist[1][:-1],hist[0],lw=2,color = "Red")
+			#axes[1].set_title('Histogram of grey values',fontsize = 24)
+			axes[1].set_xlabel("Greyscale Value",fontsize = 22)
+			axes[1].set_ylabel("Count",fontsize = 22)
+
+			plt.legend()
+			#plt.legend([liThresh, OtsuThresh], ['Li', 'Otsu'])
+
+			plt.show()
 
 	def OtsuThresh(self,inputImage,plot):
 
@@ -203,8 +242,6 @@ class ChromoImage:
 		return distance#
 
 
-
-
 class Chromosome(ChromoImage): #Chromosome object, which inherits the methods of the ChromoImage class.
 
 	image = 0 # Numpy Image of the chromosome
@@ -240,26 +277,16 @@ def plot_comparison(original,filtered,filter_name):
     fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(8, 4), sharex=True,sharey=True)
 
     ax1.imshow(original, cmap=plt.cm.gray)
-    ax1.set_title('original')
-    ax1.axis('off')
+    ax1.set_title("Original Image")
+    ax1.axis("off")
     ax1.set_adjustable('box-forced')
     ax2.imshow(original, cmap=plt.cm.gray)
-    ax2.contour(filtered,cmap = plt.cm.Reds	)
+    ax2.imshow(filtered,cmap = plt.cm.gray	)
     ax2.set_title(filter_name)
-    ax2.axis('off')
-    ax2.set_adjustable('box-forced')
-
-def orderArray(points):
-
-	#print("Length of array: " + str(len(points)))
-
-	x = points[0][1]
-	y = points[0][0]
-
-	points.sort(key = lambda p: sqrt((p[1]-x)**2 + (p[0] - y)**2))
-
-	#print("Length of sorted array: " + str(len(points)))
-	return points
+    ax2.axis("off")
+    ax2.set_adjustable("box-forced")
+    fig.tight_layout()
+    plt.show()
 
 def featureExtraction(n):
 
@@ -403,7 +430,7 @@ def featureExtraction(n):
 				"59":[38],
 				"60":[0]}
 
-	plot = True
+	plot = False
 	plotmorphs = False
 
 	first = 1
@@ -430,12 +457,20 @@ def featureExtraction(n):
 
 	#########################################################################################################
 
-	#Image23.greyHistogram(Image23.image)
+	#chromoImage.greyHistogram(chromoImage.Image)
 
 	chromoImage.Image = np.array(chromoImage.pilImage)
-	print(chromoImage.Image.size)
 
-	chromoImage.greyHistogram(chromoImage.Image)
+	#try_all_thresh(chromoImage.Image,n)
+
+	#plot_comparison(chromoImage.Image, denoise_bilateral(chromoImage.Image,sigma_color = 0.1,multichannel = False),"Denoise Wavelet")
+	#plot_comparison(chromoImage.Image, denoise_tv_chambolle(chromoImage.Image,weight = 0.1,multichannel = False),"Denoise TV")
+	#plot_comparison(chromoImage.Image, denoise_tv_chambolle(chromoImage.Image,weight = 0.2,multichannel = False),"More Denoise TV")
+
+
+	#print(chromoImage.Image.size)
+
+	#chromoImage.greyHistogram(chromoImage.Image,True)
 
 	#IAM.plotImage(chromoImage.Image,"","","")
 
@@ -444,8 +479,9 @@ def featureExtraction(n):
 	###Image.OtsuThresh(Image.image,True)
 
 	chromoImage.binary = chromoImage.OtsuThresh(chromoImage.Image,False)
+	#chromoImage.binary = (chromoImage.Image > threshold_li(chromoImage.Image))
 
-	#Image.watershed(binaryImage,False)
+	#Image.watershed(binaryImage,Fals
 	#IAM.plotImage(binaryImage,"Binary Image","","")
 
 	cleared = clear_border(chromoImage.binary)
@@ -466,8 +502,6 @@ def featureExtraction(n):
 	#print(regionprops(label_image)[0])
 
 	props = regionprops(label_image)
-
-	print(str(len(regionprops(label_image))) + " objects detected." )
 
 	#Create list of cropped chromosomes
 
@@ -503,7 +537,7 @@ def featureExtraction(n):
 			variableX = region.area
 			variableY = region.minor_axis_length
 
-			ChromosomeObject.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity,region.filled_area]
+			ChromosomeObject.features = [region.area,region.eccentricity,region.minor_axis_length,region.extent,region.solidity,region.filled_area,region.major_axis_length,region.convex_area,region.equivalent_diameter]
 			#print(Chromosome.features)
 
 			featuresList.append(ChromosomeObject.features)
@@ -562,6 +596,7 @@ def featureExtraction(n):
 				rect = mpatches.Rectangle((minc-5,minr-5),(maxc-minc)+10,(maxr-minr)+10,fill = False,edgecolor = labelColour,linewidth = 1)
 				ax.text(region.centroid[1], region.centroid[0] , str(region.label) , horizontalalignment='left',verticalalignment='top',color = "white")
 				ax.add_patch(rect)
+				plt.savefig("/home/conor/Dropbox/MastersProject/Segmented/segimage" + str(chromoImage.n) + ".jpeg",bbox_inches = "tight")
 
 
 			labelX , labelY = region.centroid
@@ -578,91 +613,7 @@ def featureExtraction(n):
 			#ChromosomeObject.binary = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
 			#IAM.plotImage(ChromosomeObject.binary,"Otsu plot","","")
 			ChromosomeObject.binary = region.image
-			ChromosomeObject.binaryotsu = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
-			#ChromosomeObject.cleared = remove_small_holes(ChromosomeObject.binary)
 
-			ChromosomeObject.closed = remove_small_holes(binary_closing(ChromosomeObject.binary))
-			#ChromosomeObject.dilation = binary_dilation(ChromosomeObject.binary)
-			#ChromosomeObject.eroded = erosion(ChromosomeObject.binary)
-
-
-			#IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
-
-			#ChromosomeObject.skeleton = skeletonize(ChromosomeObject.binary)
-			ChromosomeObject.skeleton3D = skeletonize_3d(ChromosomeObject.binary)
-
-			#ChromosomeObject.closedskel = skeletonize_3d(ChromosomeObject.closed)
-			#ChromosomeObject.dilationskel = skeletonize_3d(ChromosomeObject.dilation)
-			ChromosomeObject.finalskel = skeletonize_3d(ChromosomeObject.closed)
-
-			#IAM.plotImage(ChromosomeObject.Image,"This plot","","")
-
-			#indices = np.where(np.all(skeletonize_3d(ChromosomeObject.closed) == False ,axis = 0))
-
-			profileunzipped = (np.where(ChromosomeObject.finalskel != 0))
-			#print(type(profileunzipped))
-
-			profilezipped = np.array(list(zip(profileunzipped[0],profileunzipped[1])))
-			profileflipped = reversed(profilezipped)
-
-			profileordered = IAM.order(profilezipped,False,ChromosomeObject.Image)
-
-			#profileordered = profilezipped
-
-			#print(profilezipped)
-			orderedunzipped = list(zip(*profileordered[1]))
-			#print(orderedunzipped)
-
-			#print(len(profilezipped))
-			#profileunzipped = sorted(profileunzipped, key = lambda k: [k[0],k[1]])
-
-			#print(profileunzipped)
-
-			######################################################################################
-
-			if ChromosomeObject.tYpe == 0 and plot == True:
-
-				#plot_comparison(ChromosomeObject.cleared,(ChromosomeObject.eroded),"Convex Hull")
-
-
-				fig, axes = plt.subplots(ncols=2,nrows=2, figsize=(8, 10),sharex=True,sharey=True,subplot_kw = {"adjustable":"box-forced"})
-				axA = axes.ravel()
-				#ax = ax
-
-				axA[0] = plt.subplot(2, 2, 1, adjustable='box-forced')
-				axA[1] = plt.subplot(2, 2, 2)
-				axA[2] = plt.subplot(2, 2, 3)
-				axA[3] = plt.subplot(2, 2, 4)
-
-				axA[0].imshow(ChromosomeObject.binary, cmap=plt.cm.gray)
-				axA[0].contour(ChromosomeObject.binaryotsu, cmap = plt.cm.Reds)
-
-				#axA[0].contour(ChromosomeObject.erodedskel,cmap = plt.cm.Reds)
-				axA[0].set_title('Cleared Chromosome Image')
-				axA[0].axis('off')
-
-				axA[1].imshow(ChromosomeObject.closed, cmap=plt.cm.gray)
-				axA[1].set_title('Closed chromosome Image')
-				#ax[1].contour(ChromosomeObject.skeleton3D)
-				axA[1].axis('off')
-
-				axA[2].imshow(ChromosomeObject.closed, cmap = plt.cm.gray)
-				#axA[2].contour(ChromosomeObject.closedskel,cmap=plt.cm.Reds)
-				axA[2].set_title('Image cleared of small holes')
-				#axA[2].plot(profileordered[1],profileordered[0])
-				#axA[2].contour(ChromosomeObject.skeleton3D, cmap = plt.cm.Blues)
-				axA[2].axis("off")
-
-				axA[3].imshow(ChromosomeObject.Image, cmap = plt.cm.gray)
-				#axA[3].plot(profilezipped[1],profilezipped[0])
-				axA[3].plot(orderedunzipped[1],orderedunzipped[0])
-				#axA[3].contour(ChromosomeObject.skeleton3D)
-				axA[3].set_title('Skeleton after binary closing')
-				axA[3].axis('off')
-
-				#fig.tight_layout()
-				plt.savefig("/home/conor/Desktop/Desktop/Chromosome.jpeg",bbox_inches = "tight")
-				plt.show()
 
 			#######################################################################################
 
@@ -670,77 +621,188 @@ def featureExtraction(n):
 
 			ListofChromos.append(ChromosomeObject)
 
-			"""
-
-
-	#hist = np.histogram(histList, bins = np.arange(0,20))
-	"""
-	"""
-	plt.figure()
-	plt.hist(histList,bins = 20)
-	plt.hist(badListhist,bins = 20)
-	plt.title('Histogram of region attributes: ')
-	plt.xlabel("Value")
-	plt.ylabel("Frequency")
-	plt.show(hist)
-	"""
-
-	#print(chromoList)
-
-	print(str(nhighlighted) + " objects highlighted.")
-	print(str(math.ceil(100*(nchromos/46))) + " percent of chromosomes usable")
-	#print(str(nBad) + " false positives.")
- 
-	#plt.tight_layout()
-	#plt.show()
-
-	#print(type(Image.chromoList[0].image))
-	#IAM.plotImage(Image.chromoList[0].image,"","","")
-	print("\n")
-
-	print("Number of Chromosomes for this image: " + str(len(ListofChromos)))
+	print(str(len(regionprops(label_image))) + " objects detected.\n" + str(nhighlighted) + " objects highlighted.\n" + str(math.ceil(100*(nchromos/46))) + " percent of chromosomes usable\n" + "Number of Chromosomes for this image: " + str(len(ListofChromos)) + "\n")
 
 	return(ListofChromos)
+
+def try_all_thresh(image,n):
+
+	plot = False
+
+	#axA[0] = plt.subplot(2, 2, 1, adjustable='box-forced')
+	#axA[1] = plt.subplot(2, 2, 2)
+	#axA[2] = plt.subplot(2, 2, 3)
+	#axA[3] = plt.subplot(2, 2, 4)
+	#axA = axes.rav
+
+	plt.figure()
+	plt.imshow(image, cmap = plt.cm.gray)
+	#plt.title('Original Image')
+	plt.axis("off")
+	plt.savefig("/home/conor/Dropbox/MastersProject/ThresholdGraphs/Original" + str(n) + ".jpeg",bbox_inches = "tight")
+
+
+	plt.imshow(image > threshold_otsu(image), cmap = plt.cm.gray)
+	#plt.title('Otsu')
+	plt.axis("off")
+	plt.savefig("/home/conor/Dropbox/MastersProject/ThresholdGraphs/OtsuThresh" + str(n) + ".jpeg",bbox_inches = "tight")
+
+
+	plt.imshow(image > threshold_li(image), cmap = plt.cm.gray)
+	#plt.title('Li')
+	plt.axis("off")
+	plt.savefig("/home/conor/Dropbox/MastersProject/ThresholdGraphs/LiThresh" + str(n) + ".jpeg",bbox_inches = "tight")
+
+
+	plt.imshow(image > threshold_yen(image), cmap = plt.cm.gray)
+	#plt.title('Yen')
+	plt.axis("off")
+	plt.savefig("/home/conor/Dropbox/MastersProject/ThresholdGraphs/YenThresh" + str(n) + ".jpeg",bbox_inches = "tight")
+
+
+	#fig.tight_layout()
+	#plt.savefig("/home/conor/Dropbox/MastersProject/ThresholdGraphs/GraphsAllThresh" + str(n) + ".jpeg",bbox_inches = "tight")
+
+	if plot == True:
+		plt.show()
+
+	return
+
+def correlation_Matrix(features):
+
+	correlations = features.corr()
+
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	cax = ax.matshow(correlations, vmin=-1, vmax=1)
+	fig.colorbar(cax)
+	ticks = np.arange(0,9,1)
+	ax.set_xticks(ticks)
+	ax.set_yticks(ticks)
+	ax.set_xticklabels(names)
+	ax.set_yticklabels(names)
+	plt.show()
+
+	return
+
+def processChromosome(Image,plot):
+
+	ChromosomeObject.binaryotsu = chromoImage.OtsuThresh(ChromosomeObject.Image,False)
+	#ChromosomeObject.cleared = remove_small_holes(ChromosomeObject.binary)
+
+	ChromosomeObject.closed = remove_small_holes(binary_closing(ChromosomeObject.binary))
+	#ChromosomeObject.dilation = binary_dilation(ChromosomeObject.binary)
+	#ChromosomeObject.eroded = erosion(ChromosomeObject.binary)
+
+
+	#IAM.plotImage(ChromosomeObject.cleared,"Cleared Image","","")
+
+	#ChromosomeObject.skeleton = skeletonize(ChromosomeObject.binary)
+	ChromosomeObject.skeleton3D = skeletonize_3d(ChromosomeObject.binary)
+
+	#ChromosomeObject.closedskel = skeletonize_3d(ChromosomeObject.closed)
+	#ChromosomeObject.dilationskel = skeletonize_3d(ChromosomeObject.dilation)
+	ChromosomeObject.finalskel = skeletonize_3d(ChromosomeObject.closed)
+
+	#IAM.plotImage(ChromosomeObject.Image,"This plot","","")
+
+	#indices = np.where(np.all(skeletonize_3d(ChromosomeObject.closed) == False ,axis = 0))
+
+	profileunzipped = (np.where(ChromosomeObject.finalskel != 0))
+	#print(type(profileunzipped))
+
+	profilezipped = np.array(list(zip(profileunzipped[0],profileunzipped[1])))
+
+	profileordered = IAM.order(profilezipped,False,ChromosomeObject.Image)
+	profileflipped = reversed(profileordered[1])
+
+	#profileordered = profilezipped
+
+	#print(profilezipped)
+	orderedunzipped = list(zip(*profileordered[1]))
+	#print(orderedunzipped)
+
+	#print(len(profilezipped))
+	#profileunzipped = sorted(profileunzipped, key = lambda k: [k[0],k[1]])
+
+	#print(profileunzipped)
+
+	######################################################################################
+
+	if ChromosomeObject.tYpe == 0 and plot == True:
+
+		#plot_comparison(ChromosomeObject.cleared,(ChromosomeObject.eroded),"Convex Hull")
+
+
+		fig, axes = plt.subplots(ncols=2,nrows=2, figsize=(8, 10),sharex=True,sharey=True,subplot_kw = {"adjustable":"box-forced"})
+		axA = axes.ravel()
+		#ax = ax
+
+		axA[0] = plt.subplot(2, 2, 1, adjustable='box-forced')
+		axA[1] = plt.subplot(2, 2, 2)
+		axA[2] = plt.subplot(2, 2, 3)
+		axA[3] = plt.subplot(2, 2, 4)
+
+		axA[0].imshow(ChromosomeObject.binary, cmap=plt.cm.gray)
+		axA[0].contour(ChromosomeObject.binaryotsu, cmap = plt.cm.Reds)
+
+		#axA[0].contour(ChromosomeObject.erodedskel,cmap = plt.cm.Reds)
+		axA[0].set_title('Cleared Chromosome Image')
+		axA[0].axis('off')
+
+		axA[1].imshow(ChromosomeObject.closed, cmap=plt.cm.gray)
+		axA[1].set_title('Closed chromosome Image')
+		#ax[1].contour(ChromosomeObject.skeleton3D)
+		axA[1].axis('off')
+
+		axA[2].imshow(ChromosomeObject.closed, cmap = plt.cm.gray)
+		#axA[2].contour(ChromosomeObject.closedskel,cmap=plt.cm.Reds)
+		axA[2].set_title('Image cleared of small holes')
+		#axA[2].plot(profileordered[1],profileordered[0])
+		#axA[2].contour(ChromosomeObject.skeleton3D, cmap = plt.cm.Blues)
+		axA[2].axis("off")
+
+		axA[3].imshow(ChromosomeObject.Image, cmap = plt.cm.gray)
+		#axA[3].plot(profilezipped[1],profilezipped[0])
+		axA[3].plot(orderedunzipped[1],orderedunzipped[0])
+		#axA[3].contour(ChromosomeObject.skeleton3D)
+		axA[3].set_title('Skeleton after binary closing')
+		axA[3].axis('off')
+
+		#fig.tight_layout()
+		plt.savefig("/home/conor/Desktop/Desktop/Chromosome.jpeg",bbox_inches = "tight")
+		plt.show()
+
+	processedData[0] = profileordered[0] #Banding Pattern length
+	processedData[1] = profileordered
+	processedData[2] = profileflipped
+
+	return processedData
+
+def classifier_Test(ClassifierList):
+
+
+
+	return
+
 
 imageList = []
 
 TotalChromoList = []
 
-for n in range(1,60+1,1):
 
-	imageList.append(ChromoImage(n)) # Add each image to the list of chromosomes
+#for n in range(1,60+1,1):
+#
+#	imageList.append(ChromoImage(n)) # Add each image to the list of chromosomes
 
-TotalChromoList = []
+LastIMage = 5
 
-TotalChromoList = TotalChromoList + (Parallel(n_jobs = 1)(delayed(featureExtraction)(i) for i in range(1,61,1)))
+TotalChromoList = [] #List containing all chromosome objects created across all images
 
-print("Chromosome type: " + str(TotalChromoList[3][12].tYpe))
+TotalChromoList = TotalChromoList + (Parallel(n_jobs = -1)(delayed(featureExtraction)(i) for i in range(1,LastIMage+1,1)))
+TotalChromoList = np.array(TotalChromoList)
 
-print("Size of list: ")
-
-print(np.array(TotalChromoList).shape)
-
-nbins = 60
-
-plt.figure()
-
-plt.scatter(XListGood,YListGood,color = "g" )
-plt.scatter(XListBad,YListBad,color = "r" )
-plt.scatter(XListAnom,YListAnom,color = "b")
-
-
-#plt.title(XLabel + " vs " + YLabel)
-
-plt.figure()
-plt.hist(histList,bins = nbins,color = "g")
-plt.hist(badListhist,bins = nbins,color = "r")
-plt.hist(AnomList,bins = nbins,color = "b")
-
-plt.title('Histogram of region attributes: ')
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.show()
-
+#print("Chromosome type: " + str(TotalChromoList[3][12].tYpe))
 
 
 
@@ -753,6 +815,117 @@ print("Total amount of objects indentified: " + str(len(labels)))
 
 						##################################################################################################
 
+labelList = [] 		#List of labels for chromosomes
+featuresList = [] 	#List of features for chromosomes
+
+
+for i in range(0,LastIMage,1): #Cycle through each image
+
+	for j in range(0,len(TotalChromoList[i]),1): #Cycle through the chromosomes in each image
+
+		labelList.append(TotalChromoList[i][j].tYpe) #Assign the label to the data point
+		featuresList.append(TotalChromoList[i][j].features) #Assign the features to the data point
+
+#print(labelList)
+
+labels = pd.Series(labelList,name = "Labels")
+
+names = ["Area","Eccentricity","Minor\nAxis","Extent","Solidity","Filled\nArea","Major\nAxis","Convex\nArea","Equivalent\nDiameter"] #Names of features
+features = pd.DataFrame(featuresList,columns = names) #
+
+#features["Labels"] = labels
+
+#print(features.describe())
+#features.hist()
+
+correlation_Matrix(features)
+
+color_wheel = {1: "#7bc043",2:"#ee4035",3:"#0392cf"}
+colors = labels.map(lambda x: color_wheel.get(x+1))
+
+#fig = ff.create_scatterplotmatrix(features,index = "Labels")
+#py.plot(fig,filename = "Scatter Matrix")
+
+scatter_matrix(features,color = colors ,alpha = 1)
+plt.show()
+
+
+TestSize = 0.2
+Seed = 1
+scoring = "accuracy"
+pcacomponents = 4
+
+Hists = []
+
+
+logistic = linear_model.LogisticRegression()
+
+pca = decomposition.PCA(n_components = pcacomponents) #Create Principle Component Analysis Object.
+
+pcaNames = []
+for i in range (1,pcacomponents+1,1):
+
+	pcaNames.append("Principal\nComponent " + str(i))
+
+
+# Fit and transform the data to the model
+correlation_Matrix(pd.DataFrame(pca.fit_transform(features),columns = pcaNames))
+
+pcafeatures = pca.fit_transform(features)
+
+#print(reduced_data_pca)
+
+features_train, features_test, labels_train, labels_test = model_selection.train_test_split(pcafeatures,labels,test_size = TestSize, random_state = Seed)
+
+
+Classifiers = []
+
+Classifiers.append(("Logistic Regression",LogisticRegression()))
+Classifiers.append(("Linear Discriminant Analysis",LinearDiscriminantAnalysis()))
+Classifiers.append(("K-Nearest Neighbours",KNeighborsClassifier()))
+Classifiers.append(("Decision Tree",DecisionTreeClassifier()))
+Classifiers.append(("Naive Bayes",GaussianNB()))
+Classifiers.append(("Support Vector Machine",SVC()))
+
+results = []
+names = []
+
+#(features)
+
+if pcacomponents == 2:
+
+	feats = list(zip(*pcafeatures))
+
+	plt.figure()
+	plt.scatter(feats[0],feats[1])
+	plt.show()
+print()
+
+for name, model in Classifiers:
+
+	kfold = model_selection.KFold(n_splits = 10,random_state = Seed)
+	cv_results = model_selection.cross_val_score(model, features_train, labels_train, cv = kfold, scoring = scoring)
+	results.append(cv_results)
+	names.append(name)
+	msg = "%s: %f (%f)" % (name,cv_results.mean(),cv_results.std())
+	print(msg)
+	Hists.append(cv_results)
+
+#classifier_Test(Classifiers) #Run test evaluation on classifiers
+print()
+
+
+
+Hists = pd.DataFrame(Hists)
+Hists.hist()
+plt.show
+
+print(Hists)
+
+
+
+
+"""
 
 percentage = 99
 
@@ -785,6 +958,9 @@ TestfeaturesList = featuresList[Testbegin:len(featuresList):1] 	#Take the chromo
 Testlabels = labels[Testbegin:len(featuresList):1]
 print(str(len(Testlabels)) + " test data points.")
 
+"""
+
+
 
 clf = tree.DecisionTreeClassifier()
 #clf = KNeighborsClassifier
@@ -805,5 +981,3 @@ for n in range(0,len(Testlabels)): #How many of the identifcations are correct?
 	#print("Ncorrect: " + str(ncorrect))
 
 print("\nAccuracy: " + (str((ncorrect/(len(Testlabels)))*100)) + "%")
-
-#for n in range (first,final): #Iterate through all images
